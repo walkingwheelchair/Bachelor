@@ -1,5 +1,5 @@
 Modell,Variante,Accuracy,Log_Loss
-Logistic Regression,OHNE xG,0.5125,0.9867
-Random Forest,OHNE xG,0.5125,1.0011
-Logistic Regression,MIT xG,0.5548,0.9518
-Random Forest,MIT xG,0.5519,0.9526
+Logistic Regression,OHNE xG,0.5262,0.9908
+XGBoost,OHNE xG,0.4512,1.1866
+Logistic Regression,MIT xG,0.5556,0.9564
+XGBoost,MIT xG,0.5094,1.148

@@ -261,130 +261,79 @@ def load_xg_data() -> pd.DataFrame:
 # ROLLING WINDOW FEATURES
 # ─────────────────────────────────────────────────────────────────────────────
 
-ROLLING_N = 20  # letzte N Spiele
-
-
-def _get_team_match_history(df: pd.DataFrame) -> dict:
+def compute_rolling_features(df: pd.DataFrame, span: int = 10) -> pd.DataFrame:
     """
-    Erstellt für jedes Team eine chronologisch sortierte Liste ihrer Spiele
-    mit relevanten Statistiken (aus Heim- UND Auswärtsspielen).
-    Gibt dict: team -> list of dicts
+    Fügt Rolling-Window-Features (EWA) für Heim- und Auswärtsteam hinzu.
+    Berücksichtigt Overall-Form sowie spezifische Home- und Away-Form.
     """
-    history = {}  # team -> [ {date, goals_scored, goals_conceded, points}, ... ]
-
-    for _, row in df.iterrows():
-        home = row["HomeTeam"]
-        away = row["AwayTeam"]
-        ftr = row["FTR"]
-        date = row.get("Date", pd.NaT)
-
-        fthg = row.get("FTHG", np.nan)
-        ftag = row.get("FTAG", np.nan)
-
-        # Punkte
-        if ftr == "H":
-            home_pts, away_pts = 3, 0
-        elif ftr == "A":
-            home_pts, away_pts = 0, 3
-        else:
-            home_pts, away_pts = 1, 1
-
-        for team, scored, conceded, pts, is_home in [
-            (home, fthg, ftag, home_pts, 1),
-            (away, ftag, fthg, away_pts, 0),
-        ]:
-            if team not in history:
-                history[team] = []
-            history[team].append({
-                "date": date,
-                "goals_scored": scored,
-                "goals_conceded": conceded,
-                "points": pts,
-                "is_home": is_home,
-                "shots": row.get("HS" if is_home else "AS", np.nan),
-                "shots_on_target": row.get("HST" if is_home else "AST", np.nan),
-            })
-
-    return history
-
-
-def compute_rolling_features(df: pd.DataFrame, n: int = ROLLING_N) -> pd.DataFrame:
-    """
-    Fügt Rolling-Window-Features (letzte N Spiele) für Heim- und Auswärtsteam hinzu.
-    Features werden aus den Spielen VOR dem aktuellen Spiel berechnet (kein Data-Leakage).
-    """
-    # Sortiere nach Datum
     df = df.sort_values("Date").reset_index(drop=True)
+    
+    # Bilde ein "Team-Spiel"-Format, bei dem jedes Spiel 2 Zeilen hat (1x pro Team)
+    home_stats = df[["Season", "Date", "HomeTeam", "FTHG", "FTAG", "FTR", "HS", "HST"]].copy()
+    home_stats.rename(columns={
+        "HomeTeam": "Team", "FTHG": "GoalsScored", "FTAG": "GoalsConceded",
+        "HS": "Shots", "HST": "ShotsOnTarget"
+    }, inplace=True)
+    home_stats["is_home"] = 1
+    
+    away_stats = df[["Season", "Date", "AwayTeam", "FTHG", "FTAG", "FTR", "AS", "AST"]].copy()
+    away_stats.rename(columns={
+        "AwayTeam": "Team", "FTAG": "GoalsScored", "FTHG": "GoalsConceded",
+        "AS": "Shots", "AST": "ShotsOnTarget"
+    }, inplace=True)
+    away_stats["is_home"] = 0
+    
+    # Vereine und sortieren
+    all_stats = pd.concat([home_stats, away_stats]).sort_values(["Date", "Team"]).reset_index(drop=True)
+    
+    # Punkte berechnen (aus Sicht des aktuellen Teams)
+    def calc_points(row):
+        if row["FTR"] == "D": return 1
+        if row["is_home"] == 1 and row["FTR"] == "H": return 3
+        if row["is_home"] == 0 and row["FTR"] == "A": return 3
+        return 0
+        
+    all_stats["Points"] = all_stats.apply(calc_points, axis=1)
+    
+    def compute_ewa(data, span):
+        grouped = data.groupby("Team")
+        shifted = grouped.shift(1)  # Nimm die Werte der VERGANGENEN Spiele
+        ewa = shifted[["GoalsScored", "GoalsConceded", "Points", "Shots", "ShotsOnTarget"]].groupby(data["Team"]).ewm(span=span, min_periods=1).mean()
+        ewa = ewa.reset_index(level=0, drop=True)
+        return ewa
 
-    # Initialisiere Spalten
-    feature_cols = [
-        "home_avg_goals_scored", "home_avg_goals_conceded",
-        "home_avg_points", "home_win_rate", "home_draw_rate", "home_loss_rate",
-        "home_avg_shots", "home_avg_shots_on_target",
-        "away_avg_goals_scored", "away_avg_goals_conceded",
-        "away_avg_points", "away_win_rate", "away_draw_rate", "away_loss_rate",
-        "away_avg_shots", "away_avg_shots_on_target",
-    ]
-    for col in feature_cols:
-        df[col] = np.nan
-
-    # Team-History aufbauen (wird iterativ befüllt)
-    team_history: dict = {}
-
-    for idx, row in df.iterrows():
-        home = row["HomeTeam"]
-        away = row["AwayTeam"]
-
-        # Features aus bisheriger History berechnen
-        for team, prefix in [(home, "home"), (away, "away")]:
-            hist = team_history.get(team, [])
-            last_n = hist[-n:] if len(hist) >= 1 else []
-
-            if len(last_n) == 0:
-                continue  # keine History → NaN bleibt
-
-            goals_scored    = [g["goals_scored"] for g in last_n if not np.isnan(g.get("goals_scored", np.nan))]
-            goals_conceded  = [g["goals_conceded"] for g in last_n if not np.isnan(g.get("goals_conceded", np.nan))]
-            points          = [g["points"] for g in last_n]
-            shots           = [g["shots"] for g in last_n if not np.isnan(g.get("shots", np.nan))]
-            shots_on_target = [g["shots_on_target"] for g in last_n if not np.isnan(g.get("shots_on_target", np.nan))]
-
-            if goals_scored:
-                df.at[idx, f"{prefix}_avg_goals_scored"]    = np.mean(goals_scored)
-            if goals_conceded:
-                df.at[idx, f"{prefix}_avg_goals_conceded"]  = np.mean(goals_conceded)
-            if points:
-                df.at[idx, f"{prefix}_avg_points"]          = np.mean(points)
-                df.at[idx, f"{prefix}_win_rate"]             = sum(p == 3 for p in points) / len(points)
-                df.at[idx, f"{prefix}_draw_rate"]            = sum(p == 1 for p in points) / len(points)
-                df.at[idx, f"{prefix}_loss_rate"]            = sum(p == 0 for p in points) / len(points)
-            if shots:
-                df.at[idx, f"{prefix}_avg_shots"]           = np.mean(shots)
-            if shots_on_target:
-                df.at[idx, f"{prefix}_avg_shots_on_target"] = np.mean(shots_on_target)
-
-        # Jetzt das aktuelle Spiel zur History hinzufügen
-        ftr   = row["FTR"]
-        fthg  = row.get("FTHG", np.nan)
-        ftag  = row.get("FTAG", np.nan)
-        h_pts = 3 if ftr == "H" else (1 if ftr == "D" else 0)
-        a_pts = 3 if ftr == "A" else (1 if ftr == "D" else 0)
-
-        for team, scored, conceded, pts, is_home in [
-            (home, fthg, ftag, h_pts, 1),
-            (away, ftag, fthg, a_pts, 0),
-        ]:
-            if team not in team_history:
-                team_history[team] = []
-            team_history[team].append({
-                "goals_scored":    scored,
-                "goals_conceded":  conceded,
-                "points":          pts,
-                "is_home":         is_home,
-                "shots":           row.get("HS" if is_home else "AS", np.nan),
-                "shots_on_target": row.get("HST" if is_home else "AST", np.nan),
-            })
-
+    # --- 1. OVERALL FORM ---
+    overall_ewa = compute_ewa(all_stats, span)
+    overall_ewa.columns = [f"overall_ewa_{c}" for c in overall_ewa.columns]
+    all_stats = pd.concat([all_stats, overall_ewa], axis=1)
+    
+    # --- 2. HOME FORM ---
+    home_only = all_stats[all_stats["is_home"] == 1].copy()
+    home_ewa = compute_ewa(home_only, span)
+    home_ewa.columns = [f"home_form_ewa_{c}" for c in home_ewa.columns]
+    home_only = pd.concat([home_only, home_ewa], axis=1)
+    
+    # --- 3. AWAY FORM ---
+    away_only = all_stats[all_stats["is_home"] == 0].copy()
+    away_ewa = compute_ewa(away_only, span)
+    away_ewa.columns = [f"away_form_ewa_{c}" for c in away_ewa.columns]
+    away_only = pd.concat([away_only, away_ewa], axis=1)
+    
+    # Zurück in das Haupt-Dataframe (df) mergen
+    h_features = home_only[["Date", "Team"] + list(home_ewa.columns)]
+    h_overall = all_stats[all_stats["is_home"] == 1][["Date", "Team"] + list(overall_ewa.columns)]
+    h_all = h_features.merge(h_overall, on=["Date", "Team"], how="left")
+    
+    a_features = away_only[["Date", "Team"] + list(away_ewa.columns)]
+    a_overall = all_stats[all_stats["is_home"] == 0][["Date", "Team"] + list(overall_ewa.columns)]
+    a_all = a_features.merge(a_overall, on=["Date", "Team"], how="left")
+    
+    h_all.columns = [f"home_team_{c}" if c not in ["Date", "Team"] else c for c in h_all.columns]
+    a_all.columns = [f"away_team_{c}" if c not in ["Date", "Team"] else c for c in a_all.columns]
+    
+    df = df.merge(h_all, left_on=["Date", "HomeTeam"], right_on=["Date", "Team"], how="left").drop(columns=["Team"])
+    df = df.merge(a_all, left_on=["Date", "AwayTeam"], right_on=["Date", "Team"], how="left").drop(columns=["Team"])
+    
     return df
 
 
@@ -422,12 +371,16 @@ def merge_xg_features(match_df: pd.DataFrame, xg_df: pd.DataFrame) -> pd.DataFra
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE_FEATURES = [
-    "home_avg_goals_scored", "home_avg_goals_conceded",
-    "home_avg_points", "home_win_rate", "home_draw_rate", "home_loss_rate",
-    "home_avg_shots", "home_avg_shots_on_target",
-    "away_avg_goals_scored", "away_avg_goals_conceded",
-    "away_avg_points", "away_win_rate", "away_draw_rate", "away_loss_rate",
-    "away_avg_shots", "away_avg_shots_on_target",
+    "home_team_overall_ewa_GoalsScored", "home_team_overall_ewa_GoalsConceded",
+    "home_team_overall_ewa_Points", "home_team_overall_ewa_Shots", "home_team_overall_ewa_ShotsOnTarget",
+    "home_team_home_form_ewa_GoalsScored", "home_team_home_form_ewa_GoalsConceded",
+    "home_team_home_form_ewa_Points", "home_team_home_form_ewa_Shots", "home_team_home_form_ewa_ShotsOnTarget",
+    
+    "away_team_overall_ewa_GoalsScored", "away_team_overall_ewa_GoalsConceded",
+    "away_team_overall_ewa_Points", "away_team_overall_ewa_Shots", "away_team_overall_ewa_ShotsOnTarget",
+    "away_team_away_form_ewa_GoalsScored", "away_team_away_form_ewa_GoalsConceded",
+    "away_team_away_form_ewa_Points", "away_team_away_form_ewa_Shots", "away_team_away_form_ewa_ShotsOnTarget",
+    
     "goal_diff_avg",       # home - away Durchschnitts-Tordifferenz
     "points_diff_avg",     # home - away Durchschnittspunkte
 ]
@@ -442,8 +395,8 @@ XG_FEATURES = BASE_FEATURES + [
 def add_derived_features(df: pd.DataFrame, include_xg: bool = False) -> pd.DataFrame:
     """Fügt abgeleitete Differenz-Features hinzu."""
     df = df.copy()
-    df["goal_diff_avg"]   = df["home_avg_goals_scored"] - df["away_avg_goals_scored"]
-    df["points_diff_avg"] = df["home_avg_points"]       - df["away_avg_points"]
+    df["goal_diff_avg"]   = df["home_team_overall_ewa_GoalsScored"] - df["away_team_overall_ewa_GoalsScored"]
+    df["points_diff_avg"] = df["home_team_overall_ewa_Points"]       - df["away_team_overall_ewa_Points"]
 
     if include_xg:
         df["xG_diff"]  = df["home_xG_per_game"]  - df["away_xG_per_game"]
@@ -461,8 +414,8 @@ def prepare_dataset(include_xg: bool = False) -> tuple[pd.DataFrame, list[str]]:
     matches = load_bundesliga_data()
     print(f"   → {len(matches)} Spiele geladen ({matches['Season'].nunique()} Saisons)")
 
-    print("🔄 Berechne Rolling-Window-Features (letzte 20 Spiele) ...")
-    matches = compute_rolling_features(matches, n=ROLLING_N)
+    print("🔄 Berechne Rolling-Window-Features (EWA) ...")
+    matches = compute_rolling_features(matches)
 
     if include_xg:
         print("📊 Lade xG-Daten und füge sie hinzu ...")

@@ -16,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import (
     accuracy_score, log_loss,
@@ -58,11 +58,8 @@ def split_train_test(df: pd.DataFrame, train_end: str, features: list[str]):
     return X_train, y_train, X_test, y_test, train_seasons, test_seasons
 
 
-def evaluate_model(name: str, model, X_test, y_test) -> dict:
+def evaluate_model(name: str, y_test, y_pred, y_proba) -> dict:
     """Berechnet Accuracy, Log-Loss und Confusion-Matrix für ein Modell."""
-    y_pred  = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)
-
     acc  = accuracy_score(y_test, y_pred)
     ll   = log_loss(y_test, y_proba, labels=LABEL_ORDER)
     cm   = confusion_matrix(y_test, y_pred, labels=LABEL_ORDER)
@@ -102,17 +99,17 @@ def plot_confusion_matrix(results: list[dict], suffix: str = ""):
     print(f"  💾 Gespeichert: {path}")
 
 
-def plot_feature_importance(model_rf, features: list[str], suffix: str = ""):
-    """Plottet Feature-Importance des Random Forests."""
-    importances = model_rf.named_steps["clf"].feature_importances_
-    indices     = np.argsort(importances)[::-1]
+def plot_feature_importance(model_xgb, features: list[str], suffix: str = ""):
+    """Plottet Feature-Importance des XGBoost Modells."""
+    importances = model_xgb.named_steps["clf"].feature_importances_
+    indices     = np.argsort(importances)[::-1][:20]  # Nur Top 20
     sorted_feat = [features[i] for i in indices]
     sorted_imp  = importances[indices]
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 8))
     bars = ax.barh(sorted_feat[::-1], sorted_imp[::-1], color="steelblue")
     ax.set_xlabel("Wichtigkeit", fontsize=12)
-    ax.set_title("Feature Importance – Random Forest (OHNE xG)", fontsize=13, fontweight="bold")
+    ax.set_title("Feature Importance – XGBoost (OHNE xG) - Top 20", fontsize=13, fontweight="bold")
     ax.bar_label(bars, fmt="%.3f", padding=3, fontsize=9)
     plt.tight_layout()
     path = os.path.join(RESULTS_DIR, f"feature_importance_ohne_xG{suffix}.png")
@@ -154,22 +151,35 @@ def main():
                 max_iter=1000, C=1.0, random_state=42
             ))
         ]),
-        "Random Forest": Pipeline([
+        "XGBoost": Pipeline([
             ("scaler", StandardScaler()),
-            ("clf",    RandomForestClassifier(
-                n_estimators=300, max_depth=10,
-                min_samples_leaf=5, random_state=42, n_jobs=-1
+            ("clf",    XGBClassifier(
+                n_estimators=300, max_depth=6, learning_rate=0.08,
+                random_state=42, n_jobs=-1, eval_metric="mlogloss"
             ))
         ]),
     }
 
     # 5. Trainieren & Evaluieren
+    le = LabelEncoder()
+    y_train_enc = le.fit_transform(y_train)
+
     all_results = []
     trained_models = {}
     for name, model in models.items():
         print(f"\n🚀 Trainiere: {name} ...")
-        model.fit(X_train, y_train)
-        result = evaluate_model(name, model, X_test, y_test)
+        if "XGBoost" in name:
+            model.fit(X_train, y_train_enc)
+            y_pred_num = model.predict(X_test)
+            y_pred = le.inverse_transform(y_pred_num)
+            y_proba = model.predict_proba(X_test)
+            result = evaluate_model(name, y_test, y_pred, y_proba)
+        else:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            y_proba = model.predict_proba(X_test)
+            result = evaluate_model(name, y_test, y_pred, y_proba)
+            
         result["y_true"] = y_test   # <-- für Vergleichsskript
         all_results.append(result)
         trained_models[name] = model
@@ -177,7 +187,7 @@ def main():
     # 6. Visualisierungen
     print("\n📈 Erstelle Plots ...")
     plot_confusion_matrix(all_results)
-    plot_feature_importance(trained_models["Random Forest"], features)
+    plot_feature_importance(trained_models["XGBoost"], features)
 
     # 7. Ergebnisse als CSV speichern
     summary = pd.DataFrame([{
