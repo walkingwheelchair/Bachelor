@@ -186,3 +186,13 @@ df["combined_draw_tendency"] = (
 - **Reihenfolge:** Implementiere die Verbesserungen in der Reihenfolge 7 → 5 → 4 → 3 → 6 → 2 → 1, da spätere Verbesserungen auf früheren aufbauen können.
 
 Beginne mit einer kurzen Zusammenfassung, welche Dateien du anfassen wirst, bevor du mit der Implementierung startest.
+
+
+
+
+In utils.py in der Funktion merge_xg_features() soll die Logik für den Saison-Lag angepasst werden. Aktuell wird für alle Saisons der Vorjahres-xG-Wert genutzt. Das soll so geändert werden:
+
+Für abgeschlossene Saisons (alles außer der aktuellen) bleibt der Vorjahres-Lag wie er ist.
+Für die aktuelle Saison (also die, die in den xG-Daten als maximale Saison vorkommt) werden die xG-Werte direkt ohne Lag genutzt – weil diese CSV wöchentlich aktuell gehalten wird und damit kein Leakage entsteht.
+
+Die aktuelle Saison soll dynamisch ermittelt werden via xg_df["Season"].max(), nicht hardgecoded.
