@@ -4,16 +4,23 @@ predict_spiel.py
 Interaktives Vorhersage-Tool für Bundesliga-Spiele.
 Gibt Heim- und Auswärtsteam ein → alle Modelle liefern ihre Prognose.
 Nutzt die neuen Exponentially Weighted Averages (EWA) und XGBoost.
+
+[Verbesserung 6] Modellpersistenz: Modelle werden im Cache gespeichert und
+  bei unveränderter Datenbasis direkt geladen (kein Re-Training nötig).
 """
 
 import argparse
 import difflib
+import json
+import os
 import warnings
 import numpy as np
 import pandas as pd
+import joblib
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.pipeline import Pipeline
 from typing import Optional
 
@@ -21,13 +28,74 @@ from utils import (
     prepare_dataset, BASE_FEATURES, XG_FEATURES,
     load_bundesliga_data, load_xg_data,
     compute_rolling_features, merge_xg_features,
-    add_derived_features, normalize_team
+    add_derived_features, normalize_team,
+    BUNDESLIGA_DIR, XG_DIR,
 )
 
 warnings.filterwarnings("ignore")
 
 LABEL_ORDER = ["H", "D", "A"]
 LABEL_TEXT  = {"H": "Heimsieg", "D": "Unentschieden", "A": "Auswärtssieg"}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [V6] MODELL-CACHE
+# ─────────────────────────────────────────────────────────────────────────────
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+CACHE_DIR  = os.path.join(BASE_DIR, "model_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+CACHE_OHNE   = os.path.join(CACHE_DIR, "models_ohne_xG.joblib")
+CACHE_MIT    = os.path.join(CACHE_DIR, "models_mit_xG.joblib")
+CACHE_LE     = os.path.join(CACHE_DIR, "label_encoder.joblib")
+CACHE_FEATS  = os.path.join(CACHE_DIR, "features.joblib")
+CACHE_META   = os.path.join(CACHE_DIR, "meta.json")
+
+
+def _get_max_csv_mtime() -> float:
+    """Maximaler mtime aller CSV-Dateien in Bundesliga_Quellen/ und xG_Quellen/."""
+    import glob
+    files = (
+        glob.glob(os.path.join(BUNDESLIGA_DIR, "*.csv")) +
+        glob.glob(os.path.join(XG_DIR, "*.csv"))
+    )
+    if not files:
+        return 0.0
+    return max(os.path.getmtime(f) for f in files)
+
+
+def _cache_is_valid() -> bool:
+    """True, wenn Cache existiert und keine CSV neuer ist als der Cache-Timestamp."""
+    required = [CACHE_OHNE, CACHE_MIT, CACHE_LE, CACHE_FEATS, CACHE_META]
+    if not all(os.path.exists(f) for f in required):
+        return False
+    try:
+        with open(CACHE_META) as fh:
+            meta = json.load(fh)
+        cached_ts = meta.get("csv_mtime", 0.0)
+        return _get_max_csv_mtime() <= cached_ts
+    except Exception:
+        return False
+
+
+def _save_cache(models_ohne, models_mit, feat_ohne, feat_mit, le):
+    """Speichert Modelle und Metadaten im Cache."""
+    joblib.dump(models_ohne, CACHE_OHNE)
+    joblib.dump(models_mit,  CACHE_MIT)
+    joblib.dump(le,          CACHE_LE)
+    joblib.dump({"feat_ohne": feat_ohne, "feat_mit": feat_mit}, CACHE_FEATS)
+    with open(CACHE_META, "w") as fh:
+        json.dump({"csv_mtime": _get_max_csv_mtime()}, fh)
+    print("💾 Modelle im Cache gespeichert.")
+
+
+def _load_cache():
+    """Lädt Modelle aus Cache. Gibt (models_ohne, models_mit, feat_ohne, feat_mit, le) zurück."""
+    models_ohne = joblib.load(CACHE_OHNE)
+    models_mit  = joblib.load(CACHE_MIT)
+    le          = joblib.load(CACHE_LE)
+    feats       = joblib.load(CACHE_FEATS)
+    return models_ohne, models_mit, feats["feat_ohne"], feats["feat_mit"], le
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TEAM-SUCHE: Fuzzy Matching für Eingabe-Fehler
@@ -62,27 +130,44 @@ def train_all_models():
     y_ohne_enc = le.fit_transform(y_ohne)
     y_mit_enc  = le.transform(y_mit)
 
+    # [V5] Sample-Weights für XGBoost
+    sw_ohne = compute_sample_weight("balanced", y_ohne)
+    sw_mit  = compute_sample_weight("balanced", y_mit)
+
     def make_models():
         return {
             "Logistic Regression": Pipeline([
                 ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(multi_class="multinomial", solver="lbfgs", max_iter=1000, random_state=42)),
+                ("clf", LogisticRegression(
+                    multi_class="multinomial", solver="lbfgs",
+                    max_iter=1000, random_state=42,
+                    class_weight="balanced"  # [V5]
+                )),
             ]),
             "XGBoost": Pipeline([
                 ("scaler", StandardScaler()),
-                ("clf", XGBClassifier(n_estimators=300, max_depth=6, learning_rate=0.08, random_state=42, n_jobs=-1)),
+                ("clf", XGBClassifier(
+                    n_estimators=300, max_depth=6, learning_rate=0.08,
+                    random_state=42, n_jobs=-1
+                )),
             ]),
         }
 
     models_ohne = make_models()
     for name, m in models_ohne.items():
         print(f"  🔧 Trainiere (OHNE xG): {name} ...")
-        m.fit(X_ohne, y_ohne_enc if "XGBoost" in name else y_ohne)
+        if "XGBoost" in name:
+            m.fit(X_ohne, y_ohne_enc, clf__sample_weight=sw_ohne)
+        else:
+            m.fit(X_ohne, y_ohne)
 
     models_mit = make_models()
     for name, m in models_mit.items():
         print(f"  🔧 Trainiere (MIT xG):  {name} ...")
-        m.fit(X_mit, y_mit_enc if "XGBoost" in name else y_mit)
+        if "XGBoost" in name:
+            m.fit(X_mit, y_mit_enc, clf__sample_weight=sw_mit)
+        else:
+            m.fit(X_mit, y_mit)
 
     print("✅ Alle 4 Modelle trainiert.\n")
     return models_ohne, models_mit, feat_ohne, feat_mit, le
@@ -101,13 +186,13 @@ def compute_upcoming_match_features(home_team: str, away_team: str, raw_df: pd.D
     df_combined = pd.concat([raw_df, dummy_row], ignore_index=True)
     df_feat = compute_rolling_features(df_combined)
     dummy_feat = df_feat.iloc[-1:]
-    
+
     dummy_feat_xg = dummy_feat.copy()
     dummy_feat_xg = merge_xg_features(dummy_feat_xg, xg_df)
-    
+
     dummy_feat = add_derived_features(dummy_feat, include_xg=False)
     dummy_feat_xg = add_derived_features(dummy_feat_xg, include_xg=True)
-    
+
     return dummy_feat.fillna(0.0), dummy_feat_xg.fillna(0.0)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +217,7 @@ def drucke_vorhersage(home_team, away_team, dummy_feat, dummy_feat_xg, models_oh
     print(f"   {'Gew. Ø Punkte/Spiel':30} {h_pts:>12.2f} {a_pts:>12.2f}")
 
     if home_xg and away_xg:
-        print(f"\n📈 xG-SAISONDATEN:")
+        print(f"\n📈 xG-SAISONDATEN (Vorjahreswerte als Prior – kein Leakage):")
         print(f"   {'':30} {'HEIM':>12} {'AUSWÄRTS':>12}")
         print(f"   {'xG / Spiel':30} {home_xg.get('xG_per_game', np.nan):>12.2f} {away_xg.get('xG_per_game', np.nan):>12.2f}")
         print(f"   {'xGA / Spiel':30} {home_xg.get('xGA_per_game', np.nan):>12.2f} {away_xg.get('xGA_per_game', np.nan):>12.2f}")
@@ -180,19 +265,35 @@ def main():
     parser.add_argument("--heim", type=str)
     parser.add_argument("--auswaerts", type=str)
     parser.add_argument("--saison", type=str)
+    parser.add_argument("--no-cache", action="store_true", help="Cache ignorieren und Modelle neu trainieren")
     args = parser.parse_args()
 
     print("\n" + "=" * 65 + "\n  BUNDESLIGA LIVE-VORHERSAGE (MIT XGBOOST & EWA)\n" + "=" * 65)
-    models_ohne, models_mit, feat_ohne, feat_mit, le = train_all_models()
+
+    # [V6] Cache-Logik
+    if not args.no_cache and _cache_is_valid():
+        print("⚡ Modelle aus Cache geladen (kein Re-Training nötig)")
+        models_ohne, models_mit, feat_ohne, feat_mit, le = _load_cache()
+    else:
+        models_ohne, models_mit, feat_ohne, feat_mit, le = train_all_models()
+        _save_cache(models_ohne, models_mit, feat_ohne, feat_mit, le)
 
     raw_df = load_bundesliga_data()
     alle_teams = sorted(set(raw_df["HomeTeam"]) | set(raw_df["AwayTeam"]))
     saison = args.saison or raw_df["Season"].max()
 
     xg_df = load_xg_data()
-    xg_latest = xg_df[xg_df["Season"] == saison] if not xg_df.empty and saison in xg_df["Season"].values else (xg_df[xg_df["Season"] == xg_df["Season"].max()] if not xg_df.empty else pd.DataFrame())
-
-    print(f"\n📅 Aktuelle Saison für xG-Daten: {saison}\n📋 {len(alle_teams)} Teams verfügbar\n")
+    # [V1] Vorjahres-xG als Prior – verwende letzte bekannte Saison vor aktueller
+    saisons_sorted = sorted(xg_df["Season"].unique()) if not xg_df.empty else []
+    if saison in saisons_sorted:
+        idx = saisons_sorted.index(saison)
+        prior_saison = saisons_sorted[idx - 1] if idx > 0 else saison
+    else:
+        prior_saison = saisons_sorted[-1] if saisons_sorted else saison
+    xg_latest = xg_df[xg_df["Season"] == prior_saison] if not xg_df.empty else pd.DataFrame()
+    print(f"\n📅 Aktuelle Saison: {saison}")
+    print(f"📊 xG-Daten: Vorjahreswerte aus Saison {prior_saison} als Prior genutzt (kein Leakage)")
+    print(f"📋 {len(alle_teams)} Teams verfügbar\n")
 
     while True:
         heim_in = args.heim or input("🏠 Heimteam ('exit' zum Beenden): ").strip()

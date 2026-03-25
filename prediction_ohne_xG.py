@@ -18,6 +18,7 @@ import matplotlib.gridspec as gridspec
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import (
     accuracy_score, log_loss,
     confusion_matrix, classification_report,
@@ -37,6 +38,9 @@ LABEL_ORDER       = ["H", "D", "A"]
 RESULTS_DIR       = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ergebnisse")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# Hyperparameter-Tuning: auf True setzen, um RandomizedSearchCV zu aktivieren (dauert länger!)
+DO_TUNING = False
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HILFSFUNKTIONEN
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +59,7 @@ def split_train_test(df: pd.DataFrame, train_end: str, features: list[str]):
     X_test  = test[features].values
     y_test  = test["FTR"].values
 
-    return X_train, y_train, X_test, y_test, train_seasons, test_seasons
+    return X_train, y_train, X_test, y_test, train_seasons, test_seasons, test
 
 
 def evaluate_model(name: str, y_test, y_pred, y_proba) -> dict:
@@ -131,7 +135,7 @@ def main():
     df, features = prepare_dataset(include_xg=False)
 
     # 2. Train/Test Split
-    X_train, y_train, X_test, y_test, train_s, test_s = split_train_test(
+    X_train, y_train, X_test, y_test, train_s, test_s, df_test = split_train_test(
         df, TRAIN_SEASONS_END, features
     )
     print(f"\n📅 Training-Saisons  : {train_s}")
@@ -148,7 +152,8 @@ def main():
             ("scaler", StandardScaler()),
             ("clf",    LogisticRegression(
                 multi_class="multinomial", solver="lbfgs",
-                max_iter=1000, C=1.0, random_state=42
+                max_iter=1000, C=1.0, random_state=42,
+                class_weight="balanced"   # [V5] Klassen-Imbalance ausgleichen
             ))
         ]),
         "XGBoost": Pipeline([
@@ -164,12 +169,23 @@ def main():
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train)
 
+    # [V5] Sample-Weights für XGBoost (balanced)
+    sample_weights = compute_sample_weight("balanced", y_train)
+
+    # [V2] Optionales Hyperparameter-Tuning (nur wenn DO_TUNING=True)
+    if DO_TUNING:
+        from tuning import tune_xgboost
+        print("\n🔍 [Verbesserung 2] Starte Hyperparameter-Tuning für XGBoost ...")
+        best_xgb = tune_xgboost(X_train, y_train_enc)
+        models["XGBoost"].named_steps["clf"].set_params(**best_xgb.get_params())
+
     all_results = []
     trained_models = {}
     for name, model in models.items():
         print(f"\n🚀 Trainiere: {name} ...")
         if "XGBoost" in name:
-            model.fit(X_train, y_train_enc)
+            # [V5] sample_weight für Klassen-Imbalance
+            model.fit(X_train, y_train_enc, clf__sample_weight=sample_weights)
             y_pred_num = model.predict(X_test)
             y_pred = le.inverse_transform(y_pred_num)
             y_proba = model.predict_proba(X_test)
@@ -179,10 +195,12 @@ def main():
             y_pred = model.predict(X_test)
             y_proba = model.predict_proba(X_test)
             result = evaluate_model(name, y_test, y_pred, y_proba)
-            
+
         result["y_true"] = y_test   # <-- für Vergleichsskript
+        result["df_test"] = df_test # <-- für Alignment
         all_results.append(result)
         trained_models[name] = model
+    print("\nℹ️  Class-Weighting aktiv: balanced (LR: class_weight, XGBoost: sample_weight)")
 
     # 6. Visualisierungen
     print("\n📈 Erstelle Plots ...")

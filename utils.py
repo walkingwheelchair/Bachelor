@@ -341,29 +341,56 @@ def merge_xg_features(match_df: pd.DataFrame, xg_df: pd.DataFrame) -> pd.DataFra
     """
     Fügt xG-Saisondaten (per Spiel normiert) als Features hinzu.
     Join über Team + Saison.
+
+    [Update] Data-Leakage-Behebung:
+    Für abgeschlossene Saisons: Vorjahres-xG als Prior (Lag 1).
+    Für die maximale/aktuelle Saison: direkte Nutzung (kein Lag), da wöchentlich aktuell.
     """
+    print("   📊 xG-Daten: Vorjahres-Lag für historische Saisons, direkte Nutzung für aktuelle Saison")
     xg_cols = ["Team", "Season", "xG_per_game", "xGA_per_game", "xPTS_per_game"]
     available = [c for c in xg_cols if c in xg_df.columns]
     xg_slim = xg_df[available].copy()
 
-    # Home join
-    home_xg = xg_slim.rename(columns={
-        "Team": "HomeTeam",
+    all_seasons = sorted(xg_slim["Season"].unique())
+    max_season = all_seasons[-1] if len(all_seasons) > 0 else None
+
+    # Baue xg_mapped auf, indem wir pro xG-Saison definieren, für welche MatchSeason es gilt
+    rows = []
+    for i, s in enumerate(all_seasons):
+        prior = all_seasons[i - 1] if i > 0 else s
+        join_season = s if s == max_season else prior
+        
+        s_data = xg_slim[xg_slim["Season"] == join_season].copy()
+        s_data["MatchSeason"] = s
+        rows.append(s_data)
+        
+    xg_mapped = pd.concat(rows, ignore_index=True) if len(rows) > 0 else xg_slim.copy()
+
+    # Home join (Match-Saison → ermittelte xG-Saison)
+    home_xg = xg_mapped.drop(columns=["Season"]).rename(columns={
+        "Team":          "HomeTeam",
+        "MatchSeason":   "Season",
         "xG_per_game":   "home_xG_per_game",
         "xGA_per_game":  "home_xGA_per_game",
         "xPTS_per_game": "home_xPTS_per_game",
     })
+    # Nur relevante Spalten behalten
+    home_xg = home_xg[["HomeTeam", "Season", "home_xG_per_game", "home_xGA_per_game", "home_xPTS_per_game"]]
     result = match_df.merge(home_xg, on=["HomeTeam", "Season"], how="left")
 
     # Away join
-    away_xg = xg_slim.rename(columns={
-        "Team": "AwayTeam",
+    away_xg = xg_mapped.drop(columns=["Season"]).rename(columns={
+        "Team":          "AwayTeam",
+        "MatchSeason":   "Season",
         "xG_per_game":   "away_xG_per_game",
         "xGA_per_game":  "away_xGA_per_game",
         "xPTS_per_game": "away_xPTS_per_game",
     })
+    away_xg = away_xg[["AwayTeam", "Season", "away_xG_per_game", "away_xGA_per_game", "away_xPTS_per_game"]]
     result = result.merge(away_xg, on=["AwayTeam", "Season"], how="left")
+
     return result
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -375,20 +402,27 @@ BASE_FEATURES = [
     "home_team_overall_ewa_Points", "home_team_overall_ewa_Shots", "home_team_overall_ewa_ShotsOnTarget",
     "home_team_home_form_ewa_GoalsScored", "home_team_home_form_ewa_GoalsConceded",
     "home_team_home_form_ewa_Points", "home_team_home_form_ewa_Shots", "home_team_home_form_ewa_ShotsOnTarget",
-    
+
     "away_team_overall_ewa_GoalsScored", "away_team_overall_ewa_GoalsConceded",
     "away_team_overall_ewa_Points", "away_team_overall_ewa_Shots", "away_team_overall_ewa_ShotsOnTarget",
     "away_team_away_form_ewa_GoalsScored", "away_team_away_form_ewa_GoalsConceded",
     "away_team_away_form_ewa_Points", "away_team_away_form_ewa_Shots", "away_team_away_form_ewa_ShotsOnTarget",
-    
+
     "goal_diff_avg",       # home - away Durchschnitts-Tordifferenz
     "points_diff_avg",     # home - away Durchschnittspunkte
+
+    # [NEU] Unentschieden-Features
+    "abs_goal_diff",           # Absolutwert der Tordifferenz (je kleiner, desto ausgeglichener)
+    "abs_points_diff",         # Absolutwert der Punktedifferenz
+    "combined_draw_tendency",  # Kombinierter Indikator: niedrig = Gleichgewicht = Unentschieden wahrscheinlicher
 ]
 
 XG_FEATURES = BASE_FEATURES + [
     "home_xG_per_game", "home_xGA_per_game", "home_xPTS_per_game",
     "away_xG_per_game", "away_xGA_per_game", "away_xPTS_per_game",
     "xG_diff", "xGA_diff",
+    # [NEU] Unentschieden-Features (xG-spezifisch)
+    "abs_xG_diff",             # Absolutwert der xG-Differenz
 ]
 
 
@@ -398,9 +432,22 @@ def add_derived_features(df: pd.DataFrame, include_xg: bool = False) -> pd.DataF
     df["goal_diff_avg"]   = df["home_team_overall_ewa_GoalsScored"] - df["away_team_overall_ewa_GoalsScored"]
     df["points_diff_avg"] = df["home_team_overall_ewa_Points"]       - df["away_team_overall_ewa_Points"]
 
+    # [NEU] Unentschieden-Features
+    # Absolutwerte der Differenzen (je kleiner, desto ausgeglichener das Spiel)
+    df["abs_goal_diff"]   = df["goal_diff_avg"].abs()
+    df["abs_points_diff"] = df["points_diff_avg"].abs()
+
+    # Formstabilität: je niedriger beide Absolutdifferenzen, desto wahrscheinlicher Unentschieden
+    df["combined_draw_tendency"] = (
+        1.0 / (1.0 + df["abs_goal_diff"]) *
+        1.0 / (1.0 + df["abs_points_diff"])
+    )
+
     if include_xg:
         df["xG_diff"]  = df["home_xG_per_game"]  - df["away_xG_per_game"]
         df["xGA_diff"] = df["home_xGA_per_game"]  - df["away_xGA_per_game"]
+        # [NEU] Unentschieden-Features (xG-spezifisch)
+        df["abs_xG_diff"] = df["xG_diff"].abs()
 
     return df
 
