@@ -2,212 +2,221 @@
 predict_spiel.py
 ================
 Interaktives Vorhersage-Tool für Bundesliga-Spiele.
-Gibt Heim- und Auswärtsteam ein → alle Modelle liefern ihre Prognose.
-Nutzt die neuen Exponentially Weighted Averages (EWA) und XGBoost.
 
-[Verbesserung 6] Modellpersistenz: Modelle werden im Cache gespeichert und
-  bei unveränderter Datenbasis direkt geladen (kein Re-Training nötig).
+Lädt automatisch das beste Modell aus xx_Notebook (gespeichert vom Notebook).
+Gibt Heim- und Auswärtsteam ein → das beste trainierte Modell liefert die Prognose.
+
+Verwendung:
+    python predict_spiel.py
+    python predict_spiel.py --heim "Bayern Munich" --auswaerts "Dortmund"
 """
 
 import argparse
 import difflib
-import json
+import glob
 import os
 import warnings
 import numpy as np
 import pandas as pd
 import joblib
-from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.utils.class_weight import compute_sample_weight
-from sklearn.pipeline import Pipeline
 from typing import Optional
 
 from utils import (
-    prepare_dataset, BASE_FEATURES, XG_FEATURES,
     load_bundesliga_data, load_xg_data,
     compute_rolling_features, merge_xg_features,
     add_derived_features, normalize_team,
-    BUNDESLIGA_DIR, XG_DIR,
 )
 
 warnings.filterwarnings("ignore")
 
-LABEL_ORDER = ["H", "D", "A"]
-LABEL_TEXT  = {"H": "Heimsieg", "D": "Unentschieden", "A": "Auswärtssieg"}
+LABEL_TEXT = {"H": "Heimsieg ⚽", "D": "Unentschieden 🤝", "A": "Auswärtssieg ✈️"}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# [V6] MODELL-CACHE
+# BESTES MODELL LADEN
 # ─────────────────────────────────────────────────────────────────────────────
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR  = os.path.join(BASE_DIR, "model_cache")
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-CACHE_OHNE   = os.path.join(CACHE_DIR, "models_ohne_xG.joblib")
-CACHE_MIT    = os.path.join(CACHE_DIR, "models_mit_xG.joblib")
-CACHE_LE     = os.path.join(CACHE_DIR, "label_encoder.joblib")
-CACHE_FEATS  = os.path.join(CACHE_DIR, "features.joblib")
-CACHE_META   = os.path.join(CACHE_DIR, "meta.json")
+BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
+NOTEBOOK_DIR  = os.path.join(BASE_DIR, "xx_Notebook")
 
 
-def _get_max_csv_mtime() -> float:
-    """Maximaler mtime aller CSV-Dateien in Bundesliga_Quellen/ und xG_Quellen/."""
-    import glob
-    files = (
-        glob.glob(os.path.join(BUNDESLIGA_DIR, "*.csv")) +
-        glob.glob(os.path.join(XG_DIR, "*.csv"))
-    )
-    if not files:
-        return 0.0
-    return max(os.path.getmtime(f) for f in files)
+def lade_bestes_modell() -> dict:
+    """
+    Sucht im xx_Notebook Ordner nach allen best_model_*.pkl Dateien
+    und lädt die zuletzt gespeicherte (= aktuell beste).
+    """
+    pattern = os.path.join(NOTEBOOK_DIR, "best_model_*.pkl")
+    dateien = glob.glob(pattern)
 
+    if not dateien:
+        raise FileNotFoundError(
+            f"\n❌ Kein gespeichertes Modell gefunden in: {NOTEBOOK_DIR}\n"
+            f"   Bitte zuerst das Notebook ausführen (Abschnitt 5.3)."
+        )
 
-def _cache_is_valid() -> bool:
-    """True, wenn Cache existiert und keine CSV neuer ist als der Cache-Timestamp."""
-    required = [CACHE_OHNE, CACHE_MIT, CACHE_LE, CACHE_FEATS, CACHE_META]
-    if not all(os.path.exists(f) for f in required):
-        return False
-    try:
-        with open(CACHE_META) as fh:
-            meta = json.load(fh)
-        cached_ts = meta.get("csv_mtime", 0.0)
-        return _get_max_csv_mtime() <= cached_ts
-    except Exception:
-        return False
+    # Neueste Datei nehmen (nach Änderungsdatum)
+    neueste = max(dateien, key=os.path.getmtime)
+    package = joblib.load(neueste)
 
+    print(f"✅ Modell geladen: {os.path.basename(neueste)}")
+    print(f"   Typ:       {package['model_type']}")
+    print(f"   Variante:  {package['variant']}")
+    print(f"   F1 macro:  {package['metrics']['f1_macro']:.4f}")
+    print(f"   F1 Draw:   {package['metrics']['f1_draw']:.4f}")
+    print(f"   Accuracy:  {package['metrics']['accuracy']:.4f}")
+    print(f"   Gespeichert am: {package['saved_at']}\n")
 
-def _save_cache(models_ohne, models_mit, feat_ohne, feat_mit, le):
-    """Speichert Modelle und Metadaten im Cache."""
-    joblib.dump(models_ohne, CACHE_OHNE)
-    joblib.dump(models_mit,  CACHE_MIT)
-    joblib.dump(le,          CACHE_LE)
-    joblib.dump({"feat_ohne": feat_ohne, "feat_mit": feat_mit}, CACHE_FEATS)
-    with open(CACHE_META, "w") as fh:
-        json.dump({"csv_mtime": _get_max_csv_mtime()}, fh)
-    print("💾 Modelle im Cache gespeichert.")
-
-
-def _load_cache():
-    """Lädt Modelle aus Cache. Gibt (models_ohne, models_mit, feat_ohne, feat_mit, le) zurück."""
-    models_ohne = joblib.load(CACHE_OHNE)
-    models_mit  = joblib.load(CACHE_MIT)
-    le          = joblib.load(CACHE_LE)
-    feats       = joblib.load(CACHE_FEATS)
-    return models_ohne, models_mit, feats["feat_ohne"], feats["feat_mit"], le
+    return package
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TEAM-SUCHE: Fuzzy Matching für Eingabe-Fehler
+# TEAM-SUCHE: Fuzzy Matching
 # ─────────────────────────────────────────────────────────────────────────────
 def find_team(eingabe: str, alle_teams: list) -> Optional[str]:
     norm = normalize_team(eingabe)
-    if norm in alle_teams: return norm
+    if norm in alle_teams:
+        return norm
     lower_map = {t.lower(): t for t in alle_teams}
-    if eingabe.lower() in lower_map: return lower_map[eingabe.lower()]
-    if norm.lower() in lower_map: return lower_map[norm.lower()]
+    if eingabe.lower() in lower_map:
+        return lower_map[eingabe.lower()]
+    if norm.lower() in lower_map:
+        return lower_map[norm.lower()]
     matches = difflib.get_close_matches(norm, alle_teams, n=3, cutoff=0.4)
-    if matches: return matches[0]
+    if matches:
+        return matches[0]
     for team in alle_teams:
         if eingabe.lower() in team.lower() or team.lower() in eingabe.lower():
             return team
     return None
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODELLE TRAINIEREN
-# ─────────────────────────────────────────────────────────────────────────────
-def train_all_models():
-    print("📂 Lade & trainiere alle Modelle auf allen verfügbaren Daten ...")
-    df_ohne, feat_ohne = prepare_dataset(include_xg=False)
-    X_ohne = df_ohne[feat_ohne].values
-    y_ohne = df_ohne["FTR"].values
-
-    df_mit, feat_mit = prepare_dataset(include_xg=True)
-    X_mit = df_mit[feat_mit].values
-    y_mit = df_mit["FTR"].values
-
-    le = LabelEncoder()
-    y_ohne_enc = le.fit_transform(y_ohne)
-    y_mit_enc  = le.transform(y_mit)
-
-    # [V5] Sample-Weights für XGBoost
-    sw_ohne = compute_sample_weight("balanced", y_ohne)
-    sw_mit  = compute_sample_weight("balanced", y_mit)
-
-    def make_models():
-        return {
-            "Logistic Regression": Pipeline([
-                ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(
-                    multi_class="multinomial", solver="lbfgs",
-                    max_iter=1000, random_state=42,
-                    class_weight="balanced"  # [V5]
-                )),
-            ]),
-            "XGBoost": Pipeline([
-                ("scaler", StandardScaler()),
-                ("clf", XGBClassifier(
-                    n_estimators=300, max_depth=6, learning_rate=0.08,
-                    random_state=42, n_jobs=-1
-                )),
-            ]),
-        }
-
-    models_ohne = make_models()
-    for name, m in models_ohne.items():
-        print(f"  🔧 Trainiere (OHNE xG): {name} ...")
-        if "XGBoost" in name:
-            m.fit(X_ohne, y_ohne_enc, clf__sample_weight=sw_ohne)
-        else:
-            m.fit(X_ohne, y_ohne)
-
-    models_mit = make_models()
-    for name, m in models_mit.items():
-        print(f"  🔧 Trainiere (MIT xG):  {name} ...")
-        if "XGBoost" in name:
-            m.fit(X_mit, y_mit_enc, clf__sample_weight=sw_mit)
-        else:
-            m.fit(X_mit, y_mit)
-
-    print("✅ Alle 4 Modelle trainiert.\n")
-    return models_ohne, models_mit, feat_ohne, feat_mit, le
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DUMMY ROW EXTRACTION FÜR EWA
+# FEATURES FÜR KOMMENDES SPIEL BERECHNEN
 # ─────────────────────────────────────────────────────────────────────────────
-def compute_upcoming_match_features(home_team: str, away_team: str, raw_df: pd.DataFrame, xg_df: pd.DataFrame, aktuelle_saison: str):
+def compute_upcoming_match_features(
+    home_team: str,
+    away_team: str,
+    raw_df: pd.DataFrame,
+    xg_df: pd.DataFrame,
+    aktuelle_saison: str,
+) -> tuple:
+    """
+    Berechnet die Rolling/EWA-Features für ein noch nicht gespieltes Spiel,
+    indem eine Dummy-Zeile ans Ende der historischen Daten gehängt wird.
+    Gibt (dummy_feat_ohne_xg, dummy_feat_mit_xg) zurück.
+    """
     dummy_row = pd.DataFrame([{
-        "Date": pd.Timestamp.today().normalize() + pd.Timedelta(days=1),
-        "Season": aktuelle_saison,
-        "HomeTeam": home_team, "AwayTeam": away_team,
+        "Date":    pd.Timestamp.today().normalize() + pd.Timedelta(days=1),
+        "Season":  aktuelle_saison,
+        "HomeTeam": home_team,
+        "AwayTeam": away_team,
         "FTHG": np.nan, "FTAG": np.nan, "FTR": np.nan,
-        "HS": np.nan, "AS": np.nan, "HST": np.nan, "AST": np.nan
+        "HS":   np.nan, "AS":   np.nan,
+        "HST":  np.nan, "AST":  np.nan,
     }])
-    df_combined = pd.concat([raw_df, dummy_row], ignore_index=True)
-    df_feat = compute_rolling_features(df_combined)
-    dummy_feat = df_feat.iloc[-1:]
+
+    df_combined  = pd.concat([raw_df, dummy_row], ignore_index=True)
+    df_feat      = compute_rolling_features(df_combined)
+    dummy_feat   = df_feat.iloc[-1:]
 
     dummy_feat_xg = dummy_feat.copy()
     dummy_feat_xg = merge_xg_features(dummy_feat_xg, xg_df)
 
-    dummy_feat = add_derived_features(dummy_feat, include_xg=False)
+    dummy_feat    = add_derived_features(dummy_feat,    include_xg=False)
     dummy_feat_xg = add_derived_features(dummy_feat_xg, include_xg=True)
 
     return dummy_feat.fillna(0.0), dummy_feat_xg.fillna(0.0)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AUSGABE
-# ─────────────────────────────────────────────────────────────────────────────
-def drucke_vorhersage(home_team, away_team, dummy_feat, dummy_feat_xg, models_ohne, models_mit, feat_ohne, feat_mit, le, home_xg, away_xg):
-    bar = "─" * 65
-    print(f"\n{bar}\n  ⚽  VORHERSAGE: {home_team}  vs.  {away_team}\n{bar}")
 
-    h_erz = dummy_feat["home_team_overall_ewa_GoalsScored"].iloc[0]
-    a_erz = dummy_feat["away_team_overall_ewa_GoalsScored"].iloc[0]
-    h_kas = dummy_feat["home_team_overall_ewa_GoalsConceded"].iloc[0]
-    a_kas = dummy_feat["away_team_overall_ewa_GoalsConceded"].iloc[0]
-    h_pts = dummy_feat["home_team_overall_ewa_Points"].iloc[0]
-    a_pts = dummy_feat["away_team_overall_ewa_Points"].iloc[0]
+# ─────────────────────────────────────────────────────────────────────────────
+# VORHERSAGE BERECHNEN & AUSGEBEN
+# ─────────────────────────────────────────────────────────────────────────────
+def drucke_vorhersage(
+    home_team:     str,
+    away_team:     str,
+    dummy_feat:    pd.DataFrame,
+    dummy_feat_xg: pd.DataFrame,
+    package:       dict,
+    xg_latest:     pd.DataFrame,
+    xg_df:         pd.DataFrame,
+) -> None:
+    model      = package['model']
+    scaler     = package['scaler']
+    features   = package['features']
+    le_classes = package['le_classes']        # ['A', 'D', 'H']
+    model_type = package['model_type']
+    variant    = package['variant']
+
+    bar = "─" * 65
+
+    # ── Feature-Vektor auswählen (mit oder ohne xG je nach Variante) ──────────
+    # Die Variante aus dem Notebook verrät uns welche Features genutzt wurden
+    use_xg = "xG" in variant or "Mit xG" in variant
+    source_df = dummy_feat_xg if use_xg else dummy_feat
+
+    # Sicherstellen dass alle Features vorhanden sind
+    fehlende = [f for f in features if f not in source_df.columns]
+    if fehlende:
+        print(f"⚠️  Fehlende Features: {fehlende} — werden mit 0 aufgefüllt.")
+        for f in fehlende:
+            source_df[f] = 0.0
+
+    X_neu = source_df[features].values
+
+    # ── Skalieren & Vorhersagen ───────────────────────────────────────────────
+    X_scaled = scaler.transform(X_neu)
+    proba    = model.predict_proba(X_scaled)[0]
+
+    # Wahrscheinlichkeiten den richtigen Klassen zuordnen
+    if hasattr(model, 'classes_'):
+        model_classes = list(model.classes_)
+    else:
+        model_classes = list(range(len(proba)))
+
+    # Klassen-Index → Label ('A', 'D', 'H')
+    if isinstance(model_classes[0], (int, np.integer)):
+        # Encoded (0,1,2) → le_classes gibt die Reihenfolge
+        p = {le_classes[i]: proba[i] for i in range(len(proba))}
+    else:
+        p = {str(c): proba[i] for i, c in enumerate(model_classes)}
+
+    tip  = max(p, key=p.get)
+    conf = p[tip]
+
+    # ── Formwerte aus Features ────────────────────────────────────────────────
+    def safe_get(df, col):
+        return df[col].iloc[0] if col in df.columns else np.nan
+
+    h_erz = safe_get(dummy_feat, "home_team_overall_ewa_GoalsScored")
+    a_erz = safe_get(dummy_feat, "away_team_overall_ewa_GoalsScored")
+    h_kas = safe_get(dummy_feat, "home_team_overall_ewa_GoalsConceded")
+    a_kas = safe_get(dummy_feat, "away_team_overall_ewa_GoalsConceded")
+    h_pts = safe_get(dummy_feat, "home_team_overall_ewa_Points")
+    a_pts = safe_get(dummy_feat, "away_team_overall_ewa_Points")
+
+    # ── xG-Daten ──────────────────────────────────────────────────────────────
+    def get_xg(team):
+        r = xg_latest[xg_latest["Team"] == team] if not xg_latest.empty else pd.DataFrame()
+        if r.empty:
+            r = xg_df[xg_df["Team"] == team].tail(1)
+        if r.empty:
+            return None
+        v = r.iloc[0]
+        return {
+            "xG_per_game":  v.get("xG_per_game",  np.nan),
+            "xGA_per_game": v.get("xGA_per_game", np.nan),
+            "xPTS_per_game": v.get("xPTS_per_game", np.nan),
+        }
+
+    home_xg = get_xg(home_team)
+    away_xg = get_xg(away_team)
+
+    # ── Ausgabe ───────────────────────────────────────────────────────────────
+    print(f"\n{bar}")
+    print(f"  ⚽  VORHERSAGE:  {home_team}  vs.  {away_team}")
+    print(f"{bar}")
+    print(f"  Modell:   {model_type} | Variante: {variant}")
+    print(f"  Metriken: F1 macro={package['metrics']['f1_macro']:.3f} | "
+          f"F1 Draw={package['metrics']['f1_draw']:.3f} | "
+          f"Acc={package['metrics']['accuracy']:.3f}")
 
     print(f"\n📊 FORM (Exponentially Weighted Averages):")
     print(f"   {'':30} {'HEIM':>12} {'AUSWÄRTS':>12}")
@@ -217,115 +226,130 @@ def drucke_vorhersage(home_team, away_team, dummy_feat, dummy_feat_xg, models_oh
     print(f"   {'Gew. Ø Punkte/Spiel':30} {h_pts:>12.2f} {a_pts:>12.2f}")
 
     if home_xg and away_xg:
-        print(f"\n📈 xG-SAISONDATEN (Vorjahreswerte als Prior – kein Leakage):")
+        print(f"\n📈 xG-DATEN (Vorjahreswerte als Prior):")
         print(f"   {'':30} {'HEIM':>12} {'AUSWÄRTS':>12}")
-        print(f"   {'xG / Spiel':30} {home_xg.get('xG_per_game', np.nan):>12.2f} {away_xg.get('xG_per_game', np.nan):>12.2f}")
-        print(f"   {'xGA / Spiel':30} {home_xg.get('xGA_per_game', np.nan):>12.2f} {away_xg.get('xGA_per_game', np.nan):>12.2f}")
-        print(f"   {'xPTS / Spiel':30} {home_xg.get('xPTS_per_game', np.nan):>12.2f} {away_xg.get('xPTS_per_game', np.nan):>12.2f}")
+        print(f"   {'xG / Spiel':30} {home_xg.get('xG_per_game', np.nan):>12.2f} "
+              f"{away_xg.get('xG_per_game', np.nan):>12.2f}")
+        print(f"   {'xGA / Spiel':30} {home_xg.get('xGA_per_game', np.nan):>12.2f} "
+              f"{away_xg.get('xGA_per_game', np.nan):>12.2f}")
+        print(f"   {'xPTS / Spiel':30} {home_xg.get('xPTS_per_game', np.nan):>12.2f} "
+              f"{away_xg.get('xPTS_per_game', np.nan):>12.2f}")
 
-    est_home_goals = (h_erz + a_kas) / 2
-    est_away_goals = (a_erz + h_kas) / 2
-    if home_xg and away_xg and not pd.isna(home_xg.get("xG_per_game")):
-        est_h_xg = (home_xg["xG_per_game"] + away_xg["xGA_per_game"]) / 2
-        est_a_xg = (away_xg["xG_per_game"] + home_xg["xGA_per_game"]) / 2
-    else: est_h_xg = est_a_xg = None
+    # Grobe Torschätzung
+    est_home = (h_erz + a_kas) / 2
+    est_away = (a_erz + h_kas) / 2
+    print(f"\n🎯 ERWARTETE TORE (grobe Schätzung):")
+    print(f"   {home_team[-22:]:<24} {est_home:.2f}  |  "
+          f"{away_team[-22:]:<24} {est_away:.2f}")
 
-    print(f"\n🎯 ERWARTETE TORE (Grobe Schätzung):")
-    print(f"   OHNE xG:  {home_team[-20:]:<22} {est_home_goals:.2f}  |  {away_team[-20:]:<22} {est_away_goals:.2f}")
-    if est_h_xg is not None:
-        print(f"   MIT xG:   {home_team[-20:]:<22} {est_h_xg:.2f}  |  {away_team[-20:]:<22} {est_a_xg:.2f}")
+    # ── Hauptergebnis ─────────────────────────────────────────────────────────
+    print(f"\n{bar}")
+    print(f"  📋  MODELL-VORHERSAGE ({model_type})")
+    print(f"{bar}")
+    print(f"  {'Ergebnis':<20} {'P(Heimsieg)':>13} {'P(Unentsch.)':>13} {'P(Auswärts)':>13}")
+    print(f"  {'─'*60}")
+    icon = "🏠" if tip == "H" else ("🤝" if tip == "D" else "✈️")
+    print(f"  {icon} {LABEL_TEXT[tip]:<18} "
+          f"{p.get('H', 0):>13.1%} {p.get('D', 0):>13.1%} {p.get('A', 0):>13.1%}")
 
-    print(f"\n{bar}\n  📋  MODELL-VORHERSAGEN\n{bar}")
-    print(f"  {'Modell':<30} {'Tip':>10} {'P(Heim)':>9} {'P(Unt.)':>9} {'P(Ausw.)':>9}\n  {'─'*60}")
+    print(f"\n  🏆 TIPP:  {LABEL_TEXT[tip]}  (Konfidenz: {conf:.1%})")
 
-    v_ohne = dummy_feat[feat_ohne].values
-    v_mit  = dummy_feat_xg[feat_mit].values
-    all_tips = []
+    # Konfidenz-Warnung bei knappen Entscheidungen
+    second = sorted(p.values(), reverse=True)[1]
+    if conf - second < 0.05:
+        print(f"  ⚠️  Knappe Entscheidung — Differenz zur 2. Klasse: {conf - second:.1%}")
 
-    for variant, models, vec in [("OHNE xG", models_ohne, v_ohne), ("MIT xG", models_mit, v_mit)]:
-        for name, model in models.items():
-            proba = model.predict_proba(vec)[0]
-            classes = list(le.inverse_transform(model.classes_)) if "XGBoost" in name else list(model.classes_)
-            p = {c: proba[i] for i, c in enumerate(classes)}
-            tip = max(p, key=p.get)
-            all_tips.append(tip)
-            icon = "🏠" if tip == "H" else ("🤝" if tip == "D" else "✈️")
-            print(f"  {f'{name} [{variant}]':<30} {icon} {LABEL_TEXT[tip]:<11} {p.get('H',0):>8.1%} {p.get('D',0):>9.1%} {p.get('A',0):>9.1%}")
+    print(f"{bar}\n")
 
-    from collections import Counter
-    c = Counter(all_tips)
-    maj = c.most_common(1)[0][0]
-    print(f"{bar}\n  🗳️  KONSENS ({c.most_common(1)[0][1]}/4 Modelle): {'🏠' if maj == 'H' else ('🤝' if maj == 'D' else '✈️')} {LABEL_TEXT[maj]}\n{bar}\n")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--heim", type=str)
-    parser.add_argument("--auswaerts", type=str)
-    parser.add_argument("--saison", type=str)
-    parser.add_argument("--no-cache", action="store_true", help="Cache ignorieren und Modelle neu trainieren")
+    parser = argparse.ArgumentParser(
+        description="Bundesliga Spielvorhersage mit bestem Notebook-Modell"
+    )
+    parser.add_argument("--heim",       type=str, help="Heimteam")
+    parser.add_argument("--auswaerts",  type=str, help="Auswärtsteam")
+    parser.add_argument("--saison",     type=str, help="Saison (z.B. 2024/25)")
     args = parser.parse_args()
 
-    print("\n" + "=" * 65 + "\n  BUNDESLIGA LIVE-VORHERSAGE (MIT XGBOOST & EWA)\n" + "=" * 65)
+    print("\n" + "=" * 65)
+    print("  BUNDESLIGA VORHERSAGE — BESTES NOTEBOOK-MODELL")
+    print("=" * 65 + "\n")
 
-    # [V6] Cache-Logik
-    if not args.no_cache and _cache_is_valid():
-        print("⚡ Modelle aus Cache geladen (kein Re-Training nötig)")
-        models_ohne, models_mit, feat_ohne, feat_mit, le = _load_cache()
-    else:
-        models_ohne, models_mit, feat_ohne, feat_mit, le = train_all_models()
-        _save_cache(models_ohne, models_mit, feat_ohne, feat_mit, le)
+    # ── Bestes Modell laden ───────────────────────────────────────────────────
+    package = lade_bestes_modell()
 
-    raw_df = load_bundesliga_data()
+    # ── Rohdaten laden ────────────────────────────────────────────────────────
+    print("📂 Lade Spieldaten ...")
+    raw_df     = load_bundesliga_data()
     alle_teams = sorted(set(raw_df["HomeTeam"]) | set(raw_df["AwayTeam"]))
-    saison = args.saison or raw_df["Season"].max()
+    saison     = args.saison or raw_df["Season"].max()
 
     xg_df = load_xg_data()
-    # [V1] Vorjahres-xG als Prior – verwende letzte bekannte Saison vor aktueller
+
+    # xG Vorjahreswerte als Prior
     saisons_sorted = sorted(xg_df["Season"].unique()) if not xg_df.empty else []
     if saison in saisons_sorted:
-        idx = saisons_sorted.index(saison)
+        idx          = saisons_sorted.index(saison)
         prior_saison = saisons_sorted[idx - 1] if idx > 0 else saison
     else:
         prior_saison = saisons_sorted[-1] if saisons_sorted else saison
-    xg_latest = xg_df[xg_df["Season"] == prior_saison] if not xg_df.empty else pd.DataFrame()
-    print(f"\n📅 Aktuelle Saison: {saison}")
-    print(f"📊 xG-Daten: Vorjahreswerte aus Saison {prior_saison} als Prior genutzt (kein Leakage)")
-    print(f"📋 {len(alle_teams)} Teams verfügbar\n")
 
+    xg_latest = (xg_df[xg_df["Season"] == prior_saison]
+                 if not xg_df.empty else pd.DataFrame())
+
+    print(f"📅 Saison:    {saison}")
+    print(f"📊 xG-Prior:  {prior_saison}")
+    print(f"📋 Teams:     {len(alle_teams)} verfügbar\n")
+
+    # ── Vorhersage-Loop ───────────────────────────────────────────────────────
     while True:
         heim_in = args.heim or input("🏠 Heimteam ('exit' zum Beenden): ").strip()
-        if heim_in.lower() in ("exit", "q"): break
+        if heim_in.lower() in ("exit", "q"):
+            break
         args.heim = None
 
         home = find_team(heim_in, alle_teams)
         if not home:
-            print("  ❌ Team nicht gefunden.")
+            print(f"  ❌ '{heim_in}' nicht gefunden. Verfügbare Teams:\n"
+                  f"  {', '.join(alle_teams[:10])} ...\n")
             continue
+        if home != heim_in:
+            print(f"  🔍 Gefunden: {home}")
 
         ausw_in = args.auswaerts or input("✈️  Auswärtsteam: ").strip()
         args.auswaerts = None
+
         away = find_team(ausw_in, alle_teams)
-        if not away or home == away:
-            print("  ❌ Team nicht gefunden oder identisch.")
+        if not away:
+            print(f"  ❌ '{ausw_in}' nicht gefunden.\n")
+            continue
+        if away != ausw_in:
+            print(f"  🔍 Gefunden: {away}")
+        if home == away:
+            print("  ❌ Heim- und Auswärtsteam dürfen nicht identisch sein.\n")
             continue
 
-        print(f"  🔄 Berechne aktuelle dynamische EWA-Form ...")
-        dummy_feat, dummy_feat_xg = compute_upcoming_match_features(home, away, raw_df, xg_df, saison)
+        print(f"\n  🔄 Berechne EWA-Features für {home} vs. {away} ...")
+        dummy_feat, dummy_feat_xg = compute_upcoming_match_features(
+            home, away, raw_df, xg_df, saison
+        )
 
-        def get_xg(team):
-            r = xg_latest[xg_latest["Team"] == team]
-            if r.empty: r = xg_df[xg_df["Team"] == team].tail(1)
-            if r.empty: return None
-            v = r.iloc[0]
-            return {"xG_per_game": v.get("xG_per_game", np.nan), "xGA_per_game": v.get("xGA_per_game", np.nan), "xPTS_per_game": v.get("xPTS_per_game", np.nan)}
+        drucke_vorhersage(
+            home, away,
+            dummy_feat, dummy_feat_xg,
+            package,
+            xg_latest, xg_df,
+        )
 
-        home_xg, away_xg = get_xg(home), get_xg(away)
-        drucke_vorhersage(home, away, dummy_feat, dummy_feat_xg, models_ohne, models_mit, feat_ohne, feat_mit, le, home_xg, away_xg)
+        weiter = input("  ➡️  Noch ein Spiel? (Enter = ja / 'exit' = nein): ").strip().lower()
+        if weiter in ("exit", "q"):
+            break
 
-        if input("  ➡️  Noch ein Spiel? (Enter/exit): ").strip().lower() in ("exit", "q"): break
+    print("\n👋 Auf Wiedersehen!\n")
+
 
 if __name__ == "__main__":
     main()

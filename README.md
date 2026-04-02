@@ -6,27 +6,49 @@ Dieses Repository enthält den vollständigen Code einer wissenschaftlichen Bach
 
 ## 📋 Inhaltsverzeichnis
 
-1. [Wissenschaftliche Fragestellung](#-wissenschaftliche-fragestellung)
+1. [Installation](#-installation)
 2. [Projektstruktur](#-projektstruktur)
-3. [Datenbasis](#-datenbasis)
-4. [utils.py – Datenpipeline](#-utilspy--datenpipeline)
-5. [notebook.ipynb – ML-Pipeline](#-notebookipynb--ml-pipeline)
-6. [predict_spiel.py – Live-Vorhersage](#-predict_spielpy--live-vorhersage)
-7. [Ergebnisse](#-ergebnisse-ordner)
-8. [Installation & Ausführung](#-installation--ausführung)
+3. [Wissenschaftliche Fragestellung](#-wissenschaftliche-fragestellung)
+4. [Datenbasis](#-datenbasis)
+5. [Komponenten im Detail](#-komponenten-im-detail)
+6. [Ergebnisse](#-ergebnisse)
+7. [Technologie-Stack](#-technologie-stack)
 
 ---
 
-## 🔬 Wissenschaftliche Fragestellung
+## 🚀 Installation
 
-**Kernfrage:** Verbessert die Integration von Expected-Goals-Daten (xG) die Vorhersagegenauigkeit eines Machine-Learning-Modells für Bundesliga-Spielergebnisse signifikant?
+### Voraussetzungen
 
-Der **Full Time Result (FTR)** ist die Zielvariable:
-- `H` = Heimsieg
-- `D` = Unentschieden
-- `A` = Auswärtssieg
+- **Python-Version:** 3.9.6 (getestet mit Python 3.9+)
+- **Betriebssystem:** macOS / Linux / Windows
 
-Das Projekt vergleicht **8 Datensatz-Varianten** (mit/ohne xG, mit/ohne Ausreißer-Bereinigung, mit/ohne Feature-Selektion) und **2 Modellklassen** (Logistic Regression, XGBoost).
+### Dependencies installieren
+
+```bash
+# Empfohlen: Virtuelle Umgebung erstellen
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Alle benötigten Packages installieren
+pip install pandas numpy scikit-learn matplotlib seaborn xgboost joblib lightgbm
+
+# Optional: Jupyter Notebook für die Analyse
+pip install notebook
+```
+
+### Benötigte Packages (requirements.txt Äquivalent)
+
+```
+pandas>=1.3.0      # Datenverarbeitung & Feature Engineering
+numpy>=1.21.0      # Numerische Berechnungen (EWA, Arrays)
+scikit-learn>=1.0  # ML-Modelle (LogisticRegression, RandomForest, Metriken)
+xgboost>=1.5.0     # XGBoost Klassifikator (Hauptmodell)
+lightgbm>=3.3.0    # LightGBM Alternative
+matplotlib>=3.4.0  # Visualisierungen
+seaborn>=0.11.0    # Statistische Plots, Heatmaps
+joblib>=1.1.0      # Modell-Persistenz (Cache)
+```
 
 ---
 
@@ -38,317 +60,466 @@ Bachelor Arbeit/
 ├── utils.py                       # Zentrale Datenpipeline & Feature Engineering
 ├── predict_spiel.py               # Interaktives CLI-Tool für Live-Vorhersagen
 │
-├── Bundesliga_Quellen/            # Rohdaten: Spielergebnisse 2016–2026 (10 CSVs)
-│   ├── Bundesliga 2016-2017.csv
+├── Bundesliga_Quellen/            # Rohdaten: 10 CSV-Dateien mit Spielergebnissen
+│   ├── Bundesliga 2016-2017.csv   # ~306 Spiele pro Saison
+│   ├── Bundesliga 2017-2018.csv
 │   ├── ...
-│   └── Bundesliga 2025-2026.csv
+│   └── Bundesliga 2025-2026.csv   # Laufende Saison
 │
-├── xG_Quellen/                    # xG-Saisondaten pro Team 2016–2026 (10 CSVs)
-│   ├── xG 2016-2017.csv
+├── xG_Quellen/                    # Expected Goals Daten: 10 CSV-Dateien
+│   ├── xG 2016-2017.csv           # 18 Teams × Saisonstatistiken
+│   ├── xG 2017-2018.csv
 │   ├── ...
 │   └── xG 2025-2026.csv
 │
 ├── xx_Notebook/
-│   ├── notebook.ipynb             # Vollständige ML-Pipeline (EDA → Training → Evaluation)
-│   └── Kennzahlen_Erklaerung.md   # Dokumentation aller Features & Metriken (mit Formeln)
+│   ├── notebook.ipynb             # Vollständige ML-Pipeline (31 Zellen)
+│   │                              # Abschnitte:
+│   │                              # 1. Daten laden & vorbereiten
+│   │                              # 2. Data Exploration (EDA)
+│   │                              # 3. Dataframe-Varianten (12 Stück)
+│   │                              # 4. Model Training & Hyperparameter Tuning
+│   │                              # 5. Finale Auswertung & Modell-Speicherung
+│   │
+│   ├── Features_Metriken.md       # Detaillierte Dokumentation aller Features
+│   │                              # und Evaluationsmetriken mit Formeln
+│   │
+│   └── best_model_*.pkl           # Gespeicherte Modelle nach Notebook-Lauf
 │
-├── Ergebnisse/                    # Automatisch generierte Grafiken & Auswertungen
-│   ├── confusion_mit_xG.png / confusion_ohne_xG.png
-│   ├── feature_importance_mit_xG.png / feature_importance_ohne_xG.png
+├── Ergebnisse/                    # Automatisch generierte Outputs
+│   ├── confusion_ohne_xG.png      # Konfusionsmatrizen ohne xG
+│   ├── confusion_mit_xG.png       # Konfusionsmatrizen mit xG
+│   ├── feature_importance_*.png   # Feature-Importance (XGBoost)
 │   ├── vergleich_accuracy_logloss.png
 │   ├── vergleich_alle_confusion_matrices.png
-│   ├── vergleich_radar.png
-│   ├── ergebnisse_mit_xG.csv / ergebnisse_ohne_xG.csv
-│   └── vergleich_gesamt.csv
+│   ├── vergleich_radar.png        # Radar-Chart: Precision/Recall/F1
+│   ├── ergebnisse_*.csv           # Numerische Metriken als CSV
+│   └── vergleich_gesamt.csv       # Alle Modelle im Direktvergleich
 │
-└── model_cache/                   # Gecachte Modelle (automatisch erstellt)
-    ├── models_ohne_xG.joblib / models_mit_xG.joblib
-    ├── label_encoder.joblib / features.joblib
-    └── meta.json
+└── model_cache/                   # (Optional) Cache für schnelles Testing
+    ├── models_ohne_xG.joblib      # LR + XGBoost ohne xG (für Tests)
+    ├── models_mit_xG.joblib       # LR + XGBoost mit xG (für Tests)
+    ├── label_encoder.joblib       # LabelEncoder: H/D/A ↔ 0/1/2
+    ├── features.joblib            # Feature-Listen beider Varianten
+    └── meta.json                  # Timestamps für Cache-Invalidation
 ```
+
+---
+
+## 🔬 Wissenschaftliche Fragestellung
+
+**Kernfrage:** Verbessert die Integration von Expected-Goals-Daten (xG) die Vorhersagegenauigkeit eines Machine-Learning-Modells für Bundesliga-Spielergebnisse signifikant?
+
+### Zielvariable: Full Time Result (FTR)
+
+| Kodierung | Label | Bedeutung |
+|-----------|-------|-----------|
+| `H` | Heimsieg | Heimteam gewinnt |
+| `D` | Draw | Unentschieden |
+| `A` | Auswärtssieg | Auswärtsteam gewinnt |
+
+Für die Korrelationsanalyse wird FTR numerisch kodiert:
+- H → **+1** (Erfolg Heimteam)
+- D → **0** (Unentschieden)
+- A → **−1** (Niederlage Heimteam)
+
+### Untersuchte Modell-Varianten
+
+Das System vergleicht systematisch **12 Kombinationen** aus:
+
+| Achse | Optionen |
+|-------|----------|
+| **Algorithmus** | Logistic Regression, Random Forest, LightGBM, XGBoost, MLP (Neural Net) |
+| **Feature-Set** | Ohne xG (25 Features) vs. Mit xG (34 Features) |
+| **Datenvariante** | Unbereinigt vs. IQR-Ausreißer-bereinigt vs. Feature-selektiert |
 
 ---
 
 ## 📊 Datenbasis
 
-### `Bundesliga_Quellen/` – Spielergebnisse (10 CSV-Dateien, Saisons 2016/17–2025/26)
+### `Bundesliga_Quellen/` – Spielergebnisse (10 CSV-Dateien)
 
-Jede CSV enthält alle Bundesliga-Spiele einer Saison (~306 Spiele, 18 Teams). Genutzte Spalten:
+**Umfang:** 10 Saisons (2016/17–2025/26), ~2.997 Spiele gesamt, 18 Teams pro Saison
 
-| Spalte | Beschreibung |
-|--------|-------------|
-| `Date` | Spieltag |
-| `HomeTeam` / `AwayTeam` | Teamnamen |
-| `FTHG` / `FTAG` | Tore Heim/Auswärts (Full Time Home/Away Goals) |
-| `FTR` | Ergebnis: `H`, `D` oder `A` – die **Zielvariable** |
-| `HS` / `AS` | Abgegebene Schüsse Heim/Auswärts |
-| `HST` / `AST` | Schüsse aufs Tor Heim/Auswärts |
+**Genutzte Spalten:**
 
-**Umfang:** 10 Saisons, ~2.997 Spiele gesamt.
+| Spalte | Beschreibung | Typ |
+|--------|-------------|-----|
+| `Date` | Spieltag (Datum) | Date |
+| `HomeTeam` / `AwayTeam` | Teamnamen | String |
+| `FTHG` / `FTAG` | Tore Heim/Auswärts (Full Time Goals) | Integer |
+| `FTR` | Ergebnis: H/D/A | String |
+| `HS` / `AS` | Abgegebene Schüsse gesamt | Integer |
+| `HST` / `AST` | Schüsse aufs Tor (Shots on Target) | Integer |
+| `HTHG` / `HTAG` | Tore zur Halbzeit | Integer |
 
 ---
 
 ### `xG_Quellen/` – Expected Goals Statistiken (10 CSV-Dateien)
 
-Jede CSV enthält saisonbasierte xG-Werte **pro Team** (18 Einträge pro Datei):
+**Umfang:** 180 Einträge (18 Teams × 10 Saisons)
+
+**Spalten:**
 
 | Spalte | Beschreibung |
 |--------|-------------|
-| `Team` | Teamname |
-| `Season` | Saison (z.B. `2023-2024`) |
-| `xG_per_game` | Ø erwartete eigene Tore pro Spiel (Angriffsstärke) |
-| `xGA_per_game` | Ø erwartete kassierte Tore pro Spiel (Defensivschwäche) |
-| `xPTS_per_game` | Ø erwartete Punkte pro Spiel (aus xG berechnet) |
+| `team` | Teamname |
+| `matches` | Anzahl gespielter Partien |
+| `xG` | Expected Goals (Saisonsumme) |
+| `xGA` | Expected Goals Against (Saisonsumme) |
+| `xPTS` | Expected Points (aus xG berechnet) |
 
-**xG (Expected Goals)** misst, wie viele Tore eine Mannschaft basierend auf der Schussqualität *eigentlich* hätte erzielen sollen – unabhängig von Glück oder Torwartleistungen.
+**Abgeleitete Features (per Spiel):**
+- `xG_per_game` = xG / matches
+- `xGA_per_game` = xGA / matches
+- `xPTS_per_game` = xPTS / matches
 
-**Data-Leakage-Prävention:** Da Saisonwerte erst am Saisonende feststehen, wird für abgeschlossene Saisons der xG-Wert der **Vorsaison (Lag-1)** als Prior genutzt. Nur für die aktuell laufende Saison werden die wöchentlich aktualisierten Daten direkt verwendet.
+### What is xG?
+
+**Expected Goals (xG)** misst die Qualität von Torchancen. Jede Chance erhält einen Wert zwischen 0 und 1 basierend auf historischen Daten ähnlicher Situationen (Position, Winkel, Abstand, Körperteil, etc.).
+
+- **xG = 1.0** bedeutet: Aus dieser Situation wird im Durchschnitt 1 Tor erwartet
+- **xG = 0.2** bedeutet: 20% Chance auf Tor, im Durchschnitt 0.2 Tore
+
+**Warum xG?** xG ist ein stabilerer Leistungsindikator als tatsächliche Tore, da es:
+- Glück/Pech bei der Chancenverwertung herausrechnet
+- Torwartleistungen neutralisiert
+- Nachhaltige Teamstärke besser abbildet
+
+### Data-Leakage-Prävention (Lag-1-Ansatz)
+
+Da xG-Saisonwerte erst am Saisonende final feststehen, wird **Data Leakage** vermieden:
+
+| Saison-Typ | xG-Quelle |
+|------------|-----------|
+| Abgeschlossene Saisons | Vorjahres-xG (Lag-1) als Prior |
+| Aktuelle Saison | Direkte Nutzung der aktuellen Werte |
 
 ---
 
-## ⚙️ `utils.py` – Datenpipeline
+## ⚙️ Komponenten im Detail
+
+### 1. `utils.py` – Datenpipeline (20.259 Bytes)
 
 Die zentrale Bibliothek des Projekts. Wird von `notebook.ipynb` und `predict_spiel.py` importiert.
 
-### Konstanten
+#### Konstanten
 
 ```python
-BUNDESLIGA_DIR  # Absoluter Pfad zu Bundesliga_Quellen/
-XG_DIR          # Absoluter Pfad zu xG_Quellen/
-BASE_FEATURES   # Liste der 25 Basis-Features (ohne xG)
-XG_FEATURES     # Liste der 34 Features inkl. xG-Erweiterungen
+BUNDESLIGA_DIR  # Pfad zu Bundesliga_Quellen/
+XG_DIR          # Pfad zu xG_Quellen/
+BASE_FEATURES   # 25 Basis-Features (ohne xG)
+XG_FEATURES     # 34 Features (inkl. xG)
 ```
 
-### Funktionen
+#### Funktionen
 
-#### `load_bundesliga_data() → pd.DataFrame`
-Lädt alle 10 CSV-Dateien aus `Bundesliga_Quellen/`, ergänzt eine `Season`-Spalte und normalisiert Teamnamen (einheitliche Schreibweise). Gibt einen kombinierten DataFrame aller Saisons zurück (~2.997 Zeilen).
+| Funktion | Beschreibung | Rückgabewert |
+|----------|-------------|--------------|
+| `normalize_team(name: str) → str` | Normalisiert Teamnamen über Mapping (z.B. "Bayern" → "Bayern Munich") | Einheitlicher Teamname |
+| `load_bundesliga_data() → DataFrame` | Lädt alle 10 CSVs, fügt Season-Spalte hinzu, normalisiert Namen | ~2.997 Spiele |
+| `load_xg_data() → DataFrame` | Lädt alle 10 xG-CSVs, berechnet per-Game-Werte | 180 Team-Saison-Einträge |
+| `compute_rolling_features(df, span=10) → DataFrame` | Berechnet EWA-Rolling-Durchschnitte für alle Teams | DataFrame mit 20 EWA-Features |
+| `merge_xg_features(match_df, xg_df) → DataFrame` | Merged xG mit Lag-1-Logik (kein Data Leakage) | DataFrame mit xG-Features |
+| `add_derived_features(df, include_xg) → DataFrame` | Berechnet Differenz-Features (goal_diff, draw_tendency, etc.) | DataFrame mit abgeleiteten Features |
+| `prepare_dataset(include_xg) → (DataFrame, list)` | Komplettpipeline: laden → Features → xG → cleanup | Fertiger DataFrame + Feature-Liste |
 
-#### `load_xg_data() → pd.DataFrame`
-Lädt alle 10 CSV-Dateien aus `xG_Quellen/`, normalisiert Teamnamen und gibt einen kombinierten DataFrame zurück (180 Zeilen: 18 Teams × 10 Saisons).
+#### EWA (Exponentially Weighted Average)
 
-#### `normalize_team(name: str) → str`
-Normalisiert Teamnamen für konsistente Joins zwischen den Datenquellen (z.B. verschiedene Schreibweisen wie „Bayer 04" vs. „Bayer Leverkusen").
+Das Herzstück des Feature-Engineerings. Berechnet für jedes Spiel die historische Form beider Teams.
 
-#### `compute_rolling_features(df) → pd.DataFrame`
-**Das Feature-Engineering-Herzstück.** Berechnet für jedes Spiel die historische Form beider Teams mittels **EWA (Exponentially Weighted Average)**. Drei Kontexte werden getrennt berechnet:
+**Formel:**
+```
+EWA_neu = α × Wert_aktuell + (1 − α) × EWA_alt
+mit α = 2 / (span + 1)
+```
 
+**Drei Kontexte:**
 | Kontext | Beschreibung |
 |---------|-------------|
-| `overall` | EWA über alle Spiele der Saison (Heim + Auswärts) |
-| `home_form` | EWA nur über bisherige **Heimspiele** des Heimteams |
-| `away_form` | EWA nur über bisherige **Auswärtsspiele** des Auswärtsteams |
+| `overall` | EWA über alle Spiele (Heim + Auswärts) |
+| `home_form` | EWA nur über Heimspiele des Heimteams |
+| `away_form` | EWA nur über Auswärtsspiele des Auswärtsteams |
 
-Je Kontext werden folgende Kennzahlen als EWA berechnet:
+**Pro Kontext berechnete Metriken:**
 `GoalsScored`, `GoalsConceded`, `Points`, `Shots`, `ShotsOnTarget`
 
-Das ergibt **10 Features pro Team × 2 Teams = 20 EWA-Features** pro Spiel.
+→ **20 EWA-Features pro Spiel** (10 pro Team × 2 Teams)
 
-> **EWA-Formel:** `EWA_neu = α × Wert_aktuell + (1 − α) × EWA_alt`  
-> mit `α = 2 / (span + 1)`. Neuere Spiele zählen stärker; kein Spiel fällt komplett weg.
+#### Abgeleitete Features (Differenzen)
 
-Die getrennten Heim/Auswärts-Kontexte ermöglichen es dem Modell, den **Heimvorteil** zu erkennen.
-
-#### `merge_xg_features(match_df, xg_df) → pd.DataFrame`
-Fügt xG-Saisondaten per Join (Team + Saison) als Features hinzu. Implementiert die **Lag-1-Logik**: Für abgeschlossene Saisons wird der Vorjahreswert als Prior verwendet, für die aktuelle Saison der aktuelle Wert.
-
-#### `add_derived_features(df, include_xg=False) → pd.DataFrame`
-Berechnet abgeleitete Differenz- und Unentschieden-Features:
-
-| Feature | Formel | Bedeutung |
-|---------|--------|-----------|
-| `goal_diff_avg` | `home_EWA_Goals − away_EWA_Goals` | Positiv = Heimteam trifft häufiger |
-| `points_diff_avg` | `home_EWA_Points − away_EWA_Points` | Positiv = Heimteam punktstärker |
-| `abs_goal_diff` | `│goal_diff_avg│` | Je kleiner → ausgeglichener |
-| `abs_points_diff` | `│points_diff_avg│` | Je kleiner → ausgeglichener |
-| `combined_draw_tendency` | `1/(1+abs_goal) × 1/(1+abs_pts)` | Nahe 1.0 → Unentschieden wahrscheinlicher |
-| `xG_diff` | `home_xG − away_xG` | *(nur mit xG)* Angriffsunterschied |
-| `xGA_diff` | `home_xGA − away_xGA` | *(nur mit xG)* Defensivunterschied |
-| `abs_xG_diff` | `│xG_diff│` | *(nur mit xG)* Ausgeglichenheit xG |
-
-Die letzten 3 Unentschieden-Features (`abs_goal_diff`, `abs_points_diff`, `combined_draw_tendency`) wurden speziell hinzugefügt, da Unentschieden die schwierigste Klasse zur Vorhersage ist.
-
-#### `prepare_dataset(include_xg=False) → (DataFrame, list)`
-Komplette Pipeline in einer Funktion: Daten laden → EWA berechnen → xG mergen (optional) → abgeleitete Features → NaN-Zeilen entfernen. Gibt den fertigen DataFrame + Feature-Liste zurück.
+| Feature | Formel | Zweck |
+|---------|--------|-------|
+| `goal_diff_avg` | home_EWA_Goals − away_EWA_Goals | Stärkenvergleich |
+| `points_diff_avg` | home_EWA_Points − away_EWA_Points | Punktvergleich |
+| `abs_goal_diff` | \|goal_diff_avg\| | Unentschieden-Indikator |
+| `abs_points_diff` | \|points_diff_avg\| | Unentschieden-Indikator |
+| `combined_draw_tendency` | 1/(1+\|goal\|) × 1/(1+\|pts\|) | Unentschieden-Wahrscheinlichkeit |
+| `xG_diff` | home_xG − away_xG | xG-Stärkenvergleich |
+| `xGA_diff` | home_xGA − away_xGA | Defensiv-Vergleich |
+| `abs_xG_diff` | \|xG_diff\| | xG-Unentschieden-Indikator |
 
 ---
 
-## 📓 `xx_Notebook/notebook.ipynb` – ML-Pipeline
+### 2. `predict_spiel.py` – Live-Vorhersage-Tool (15.937 Bytes)
 
-Das Jupyter Notebook ist das **wissenschaftliche Kernstück** und führt die vollständige Analyse in 4 Abschnitten durch.
+Interaktives CLI-Tool für Vorhersagen zukünftiger Bundesliga-Spiele.
 
-### Abschnitt 1: Daten laden & vorbereiten
-Nutzt `utils.py`, um alle Spieldaten zu laden, EWA-Features zu berechnen und xG-Daten zu joinen. Erzeugt zwei Basis-DataFrames: `df_base` (ohne xG, ~2.955 Spiele) und `df_with_xg` (mit xG, ~2.280 Spiele).
+#### Funktionsweise
 
-### Abschnitt 2: Data Exploration (EDA)
+1. **Bestes Modell laden:** Sucht `best_model_*.pkl` im `xx_Notebook/`-Ordner, lädt die Datei mit dem neuesten Timestamp
+2. **Daten laden:** Bundesliga-Daten + xG-Daten via `utils.py`
+3. **Team-Suche:** Fuzzy-Matching für Eingaben wie "Bayern" → "Bayern Munich"
+4. **Feature-Berechnung:** Hängt Dummy-Zeile an historische Daten, berechnet EWA für bevorstehendes Spiel
+5. **Vorhersage:** Transformiert Features, ruft `predict_proba()` auf, formatiert Ausgabe
 
-| Visualisierung | Inhalt |
-|---------------|--------|
-| Balkendiagramm FTR | Verteilung von H / D / A (zeigt Heimvorteil ~45%) |
-| Histogramme (25×) | Verteilung jeder einzelnen Variable |
-| Boxplots (25×) | Ausreißer-Erkennung pro Variable |
-| Scatter Plots (25×) | Beziehung jeder Variable mit dem Target FTR |
-| Korrelationsmatrix | Heatmap aller Feature-Korrelationen inkl. Zielvariable |
+#### Das eine beste Modell (aus Notebook)
 
-### Abschnitt 3: Datensatz-Varianten (8 DataFrames)
+Das Notebook trainiert **5 Modellklassen** (LogReg, RF, LGBM, XGBoost, MLP) auf mehreren Datensatz-Varianten und speichert das **beste einzelne Modell** basierend auf F1 macro.
 
-Systematische Erstellung von 8 Varianten durch Kombination dreier Achsen:
+| Gespeichert in | Inhalt |
+|----------------|--------|
+| `best_model_xgbclassifier.pkl` | XGBoost mit bester Performance (typisch) |
+| `best_model_lgbmclassifier.pkl` | LightGBM (falls besser als XGBoost) |
+| `best_model_randomforestclassifier.pkl` | Random Forest (falls bestes Modell) |
 
-| Achse | Option A | Option B |
-|-------|---------|---------|
-| Ausreißer | Unbereinigt | IQR-Bereinigung |
-| xG | Ohne (25 Features) | Mit xG (34 Features) |
-| Feature-Selektion | Alle Features | Hoch korrelierende Features |
-
-→ `df1` bis `df8`, jeder mit passender Feature-Liste.
-
-### Abschnitt 4: Modellierung & Evaluation
-
-- **Modell:** XGBoost Klassifikator (`XGBClassifier`)
-- **Tuning:** `RandomizedSearchCV` mit `StratifiedKFold` (5 Folds) – automatische Hyperparameter-Optimierung
-- **Train/Test:** Saison 2023-2024 als Trainingsset; Saison 2024-2025 / 2025-2026 als Testset
-- **Klassen-Imbalance:** `compute_sample_weight("balanced")` gleicht die ungleiche Verteilung von H/D/A aus
-- **Ausgabe pro Variante:** Accuracy, Classification Report (Precision/Recall/F1 pro Klasse), Konfusionsmatrix
-
-Die Ausgaben (Grafiken + CSV) werden im Ordner `Ergebnisse/` gespeichert.
-
-> Eine vollständige Erklärung aller Features und Metriken (inkl. mathematischer Formeln) findet sich in `xx_Notebook/Kennzahlen_Erklaerung.md`.
-
----
-
-## 🖥️ `predict_spiel.py` – Live-Vorhersage
-
-Ein **interaktives Kommandozeilen-Tool** für Vorhersagen zukünftiger Bundesliga-Spiele. Es trainiert 4 Modelle auf allen verfügbaren historischen Daten und gibt für eine eingegebene Paarung eine strukturierte Prognose aller 4 Modelle + Konsens aus.
-
-### Die 4 Modelle
-
-| Modell | Algorithmus | Feature-Set |
-|--------|------------|------------|
-| 1 | Logistic Regression | 25 BASE_FEATURES (ohne xG) |
-| 2 | XGBoost | 25 BASE_FEATURES (ohne xG) |
-| 3 | Logistic Regression | 34 XG_FEATURES (mit xG) |
-| 4 | XGBoost | 34 XG_FEATURES (mit xG) |
-
-Alle Modelle nutzen Klassen-Gewichtung (`balanced`) um die ungleiche Verteilung von H/D/A auszugleichen. XGBoost nutzt `compute_sample_weight`, Logistic Regression `class_weight="balanced"`.
-
-### Modell-Cache (`model_cache/`)
-
-Modelle werden nach dem Training mit `joblib` auf der Festplatte gespeichert. Beim nächsten Start prüft das Tool via **mtime-Vergleich der CSV-Dateien**, ob Re-Training nötig ist. Falls keine CSV-Datei neuer ist als der Cache → sofortiger Start in Sekunden.
-
-| Datei | Inhalt |
-|-------|--------|
-| `models_ohne_xG.joblib` | LR + XGBoost ohne xG |
-| `models_mit_xG.joblib` | LR + XGBoost mit xG |
-| `label_encoder.joblib` | LabelEncoder H/D/A ↔ 0/1/2 |
-| `features.joblib` | Feature-Listen beider Varianten |
-| `meta.json` | Timestamp der CSV-Dateien beim letzten Training |
-
-### Team-Suche (Fuzzy Matching)
-Eingaben wie `"Bayern"` oder `"Dortmnd"` werden via `difflib.get_close_matches` automatisch auf den korrekten Teamnamen gemapped.
-
-### Aktuell-Form für zukünftige Spiele
-Der EWA für das bevorstehende Spiel wird berechnet, indem die Paarung als Dummy-Zeile ans Ende des DataFrames angehängt wird – so erhält man die aktuelle gewichtete Form beider Teams ohne tatsächliche Spielergebnisse zu kennen.
-
-### Ausgabe-Beispiel
-
-```
-=================================================================
-  BUNDESLIGA LIVE-VORHERSAGE (MIT XGBOOST & EWA)
-=================================================================
-
-📊 FORM (Exponentially Weighted Averages):
-                               HEIM      AUSWÄRTS
-   Gew. Ø Tore erzielt         2.31          1.87
-   Gew. Ø Tore kassiert        0.94          1.23
-   Gew. Ø Punkte/Spiel         2.41          1.98
-
-📈 xG-SAISONDATEN (Vorjahreswerte als Prior – kein Leakage):
-   xG / Spiel                  2.18          1.92
-
-─────────────────────────────────────────────────────────────────
-  Modell                         Tip      P(H)    P(D)    P(A)
-  Logistic Regression [OHNE xG]  🏠 Heimsieg   52.1%   24.3%   23.6%
-  XGBoost [OHNE xG]              🏠 Heimsieg   58.4%   21.1%   20.5%
-  Logistic Regression [MIT xG]   🏠 Heimsieg   54.7%   22.8%   22.5%
-  XGBoost [MIT xG]               🏠 Heimsieg   61.2%   19.4%   19.4%
-─────────────────────────────────────────────────────────────────
-  🗳️  KONSENS (4/4 Modelle): 🏠 Heimsieg
-─────────────────────────────────────────────────────────────────
+**Im Package enthalten:**
+```python
+{
+    'model':       trained_model,      # Das beste trainierte Modell
+    'scaler':      fitted_scaler,      # StandardScaler für Features
+    'features':    feature_list,       # Liste der verwendeten Features
+    'le_classes':  ['A', 'D', 'H'],    # LabelEncoder-Klassen
+    'model_type':  'XGBClassifier',    # Algorithmus-Name
+    'variant':     'Mit xG, IQR',      # Datensatz-Variante
+    'metrics': {                       # Evaluationsmetriken auf Testset
+        'f1_macro': 0.543,
+        'f1_draw':  0.312,
+        'accuracy': 0.567
+    }
+}
 ```
 
-### Kommandozeilen-Argumente
+> **Hinweis:** `model_cache/` wird vom Notebook verwendet, nicht von `predict_spiel.py`. Das Tool lädt direkt aus `xx_Notebook/best_model_*.pkl`.
+
+#### Kommandozeilen-Argumente
 
 ```bash
 # Interaktiver Modus (Standard)
 python3 predict_spiel.py
 
 # Direkte Eingabe ohne Interaktion
-python3 predict_spiel.py --heim Bayern --auswaerts Dortmund
+python3 predict_spiel.py --heim "Bayern Munich" --auswaerts "Borussia Dortmund"
 
 # Cache ignorieren und Modelle neu trainieren
 python3 predict_spiel.py --no-cache
 
 # Bestimmte Saison erzwingen
-python3 predict_spiel.py --saison 2024-2025
+python3 predict_spiel.py --saison 2024/25
+```
+
+#### Ausgabe-Beispiel
+
+```
+=================================================================
+  ⚽  VORHERSAGE:  Bayern Munich  vs.  Borussia Dortmund
+=================================================================
+  Modell:   XGBClassifier | Variante: Mit xG
+  Metriken: F1 macro=0.543 | F1 Draw=0.312 | Acc=0.567
+
+📊 FORM (Exponentially Weighted Averages):
+                               HEIM      AUSWÄRTS
+   Team                Bayern Munich  B. Dortmund
+   Gew. Ø Tore erzielt         2.31          1.87
+   Gew. Ø Tore kassiert        0.94          1.23
+   Gew. Ø Punkte/Spiel         2.41          1.98
+
+📈 xG-DATEN (Vorjahreswerte als Prior):
+                               HEIM      AUSWÄRTS
+   xG / Spiel                  2.18          1.92
+   xGA / Spiel                 0.89          1.15
+   xPTS / Spiel                2.35          2.01
+
+🎯 ERWARTETE TORE (grobe Schätzung):
+   Bayern Munich              2.12  |  Borussia Dortmund        1.56
+
+=================================================================
+  📋  MODELL-VORHERSAGE (XGBClassifier)
+=================================================================
+  Ergebnis           P(Heimsieg)   P(Unentsch.)    P(Auswärts)
+  ─────────────────────────────────────────────────────────────
+  🏠 Heimsieg ⚽           61.2%         19.4%         19.4%
+
+  🏆 TIPP:  Heimsieg ⚽  (Konfidenz: 61.2%)
+=================================================================
 ```
 
 ---
 
-## 📁 `Ergebnisse/` Ordner
+### 3. `xx_Notebook/notebook.ipynb` – ML-Pipeline (31 Zellen)
 
-Alle Ausgaben der Notebook-Pipeline werden hier gespeichert:
+Das wissenschaftliche Kernstück – vollständige Analyse von EDA bis Modell-Evaluation.
+
+#### Abschnitt 1: Daten laden & vorbereiten (Zelle 1-3)
+
+- Import aller Libraries (pandas, numpy, sklearn, matplotlib, seaborn, xgboost, lightgbm)
+- Laden der Spieldaten via `utils.load_bundesliga_data()`
+- Berechnen der EWA-Rolling-Features
+- Erstellen zweier Basis-DataFrames:
+  - `df_base` (~2.955 Spiele, 25 Features ohne xG)
+  - `df_with_xg` (~2.280 Spiele, 34 Features mit xG)
+
+#### Abschnitt 2: Data Exploration / EDA (Zelle 4-13)
+
+| Visualisierung | Zweck |
+|---------------|-------|
+| FTR-Balkendiagramm | Verteilung H/D/A (zeigt Heimvorteil ~45%) |
+| 25 Histogramme | Verteilung jeder einzelnen Variable |
+| 25 Boxplots | Ausreißer-Erkennung pro Variable |
+| 25 Stripplots + Regression | Feature vs. FTR (gruppiert) |
+| Korrelationsmatrix (Heatmap) | Feature-Feature-Korrelationen |
+| Feature-Target-Korrelation (Barplot) | Stärkste Prädiktoren für Heimerfolg |
+
+#### Abschnitt 3: Dataframe-Varianten erstellen (Zelle 14-17)
+
+**12 Varianten** durch Kombination dreier Achsen:
+
+| Achse | Optionen |
+|-------|----------|
+| **Ausreißer** | Unbereinigt / IQR-Bereinigung / PCA-reduziert |
+| **xG** | Ohne (25 Features) / Mit xG (34 Features) |
+| **Feature-Selektion** | Alle Features / Hoch korrelierende entfernt |
+
+**PCA-Analyse:** Visualisierung der erklärten Varianz, Scatterplot der ersten 2 Komponenten
+
+#### Abschnitt 4: Model Training & Hyperparameter Tuning (Zelle 18-24)
+
+**5 Modellklassen im Vergleich:**
+
+| Modell | sklearn-Klasse | Zweck |
+|--------|---------------|-------|
+| Logistic Regression | `LogisticRegression` | Baseline (linear) |
+| Random Forest | `RandomForestClassifier` | Ensemble-Baseline |
+| LightGBM | `LGBMClassifier` | Gradient Boosting (leicht) |
+| XGBoost | `XGBClassifier` | Hauptmodell (Gradient Boosting) |
+| MLP | `MLPClassifier` | Neuronales Netz (nicht-linear) |
+
+**Hyperparameter-Tuning:** `RandomizedSearchCV` mit `StratifiedKFold` (5 Folds)
+
+**Train/Test-Split:**
+- Training: Saison 2023-2024
+- Test: Saison 2024-2025 / 2025-2026
+
+**Klassen-Imbalance:** `compute_sample_weight("balanced")` gleicht H/D/A-Verteilung aus
+
+**Ausgabe pro Variante:**
+- Accuracy
+- Classification Report (Precision/Recall/F1 pro Klasse)
+- Konfusionsmatrix (als PNG gespeichert)
+
+#### Abschnitt 5: Finale Auswertung (Zelle 25-30)
+
+**Detaillierte Evaluation des besten Modells:**
+
+1. Alle 5 Modelle auf Testset evaluieren
+2. Metriken vergleichen: Accuracy, F1 macro, F1 draw, Log Loss
+3. Beste Modelle speichern als `best_model_*.pkl`
+
+**Gespeicherte Metadaten im Modell-Package:**
+```python
+{
+    'model': trained_model,
+    'scaler': fitted_scaler,
+    'features': list_of_features,
+    'le_classes': ['A', 'D', 'H'],  # LabelEncoder-Klassen
+    'model_type': 'XGBClassifier',
+    'variant': 'Mit xG, IQR-bereinigt',
+    'metrics': {
+        'accuracy': 0.567,
+        'f1_macro': 0.543,
+        'f1_draw': 0.312,
+        'log_loss': 1.089
+    },
+    'saved_at': '2024-04-01 15:41:23'
+}
+```
+
+---
+
+## 📁 Ergebnisse
+
+### Grafiken (`Ergebnisse/*.png`)
 
 | Datei | Inhalt |
 |-------|--------|
-| `confusion_ohne_xG.png` | Konfusionsmatrizen (LR + XGBoost) für Modelle ohne xG |
-| `confusion_mit_xG.png` | Konfusionsmatrizen für Modelle mit xG |
-| `feature_importance_ohne_xG.png` | Top-Feature-Importances (XGBoost, ohne xG) |
-| `feature_importance_mit_xG.png` | Top-Feature-Importances (XGBoost, mit xG) |
-| `vergleich_accuracy_logloss.png` | Balkendiagramm: Accuracy & Log-Loss aller 4 Modelle |
-| `vergleich_alle_confusion_matrices.png` | 2×2-Grid aller Konfusionsmatrizen im Vergleich |
-| `vergleich_radar.png` | Radar-Chart: Precision/Recall pro Klasse (H/D/A) für alle 4 Modelle |
-| `ergebnisse_ohne_xG.csv` | Numerische Metriken (Accuracy, F1 etc.) ohne xG |
-| `ergebnisse_mit_xG.csv` | Numerische Metriken mit xG |
-| `vergleich_gesamt.csv` | Alle 4 Modelle im direkten Vergleich |
+| `confusion_ohne_xG.png` | 2×2 Grid: LR + XGBoost Confusion Matrices (ohne xG) |
+| `confusion_mit_xG.png` | 2×2 Grid: LR + XGBoost Confusion Matrices (mit xG) |
+| `feature_importance_ohne_xG.png` | Top-15 Features (XGBoost, ohne xG) |
+| `feature_importance_mit_xG.png` | Top-15 Features (XGBoost, mit xG) |
+| `vergleich_accuracy_logloss.png` | Balken: Accuracy & Log-Loss aller Modelle |
+| `vergleich_alle_confusion_matrices.png` | 4×3 Grid aller Confusion Matrices |
+| `vergleich_radar.png` | Radar-Chart: Precision/Recall/F1 pro Klasse (H/D/A) |
+
+### CSV-Exports (`Ergebnisse/*.csv`)
+
+| Datei | Inhalt |
+|-------|--------|
+| `ergebnisse_ohne_xG.csv` | Accuracy, F1, Precision, Recall (ohne xG) |
+| `ergebnisse_mit_xG.csv` | Accuracy, F1, Precision, Recall (mit xG) |
+| `vergleich_gesamt.csv` | Alle 5 Modelle im Direktvergleich |
 
 ---
 
-## 🚀 Installation & Ausführung
+## 🔑 Technologie-Stack
 
-### Voraussetzungen
+| Bibliothek | Version (min) | Verwendung |
+|-----------|---------------|------------|
+| `pandas` | 1.3.0 | Datenladen, Merging, Feature Engineering, EWA-Berechnung |
+| `numpy` | 1.21.0 | Numerische Berechnungen, Arrays, EWA-Formel |
+| `scikit-learn` | 1.0.0 | LogisticRegression, RandomForest, StandardScaler, StratifiedKFold, RandomizedSearchCV, Metriken |
+| `xgboost` | 1.5.0 | XGBClassifier (Hauptmodell: Gradient Boosting) |
+| `lightgbm` | 3.3.0 | LGBMClassifier (Alternative zu XGBoost) |
+| `matplotlib` | 3.4.0 | Alle Basis-Visualisierungen, Histogramme, Boxplots |
+| `seaborn` | 0.11.0 | Heatmaps, Countplots, statistische Plots |
+| `joblib` | 1.1.0 | Modell-Persistenz (Cache + Notebook-Export) |
+| `difflib` | (stdlib) | Fuzzy Matching für Teamnamen-Eingaben |
 
-Python 3.9+ sowie:
+---
+
+## 📝 Nutzung im Alltag
+
+### Schnellstart: Spielvorhersage
 
 ```bash
-pip install pandas numpy scikit-learn matplotlib seaborn xgboost joblib
+cd "Bachelor Arbeit"
+python3 predict_spiel.py
+# Eingabe: Heimteam (z.B. "Bayern")
+# Eingabe: Auswärtsteam (z.B. "Dortmund")
 ```
 
-### Jupyter Notebook starten (EDA & ML-Pipeline)
+### Notebook analysieren
 
 ```bash
 cd "Bachelor Arbeit/xx_Notebook"
 jupyter notebook notebook.ipynb
 ```
 
-### Interaktives Vorhersage-Tool starten
+### Eigene Modelle trainieren
 
-```bash
-cd "Bachelor Arbeit"
-python3 predict_spiel.py
-```
-
-Beim ersten Start: ~1–2 Minuten Training aller 4 Modelle. Danach gecacht → nächster Start in Sekunden.
+1. Notebook Zelle 1-22 ausführen (lädt Daten, trainiert alle 12 Varianten)
+2. Zelle 28-30 ausführen (evaluiert + speichert beste Modelle)
+3. Modelle liegen in `xx_Notebook/best_model_*.pkl`
 
 ---
 
-## 🔑 Technologie-Stack
+## 📚 Weiterführende Dokumentation
 
-| Bibliothek | Verwendung |
-|-----------|-----------|
-| `pandas` | Datenladen, Merging, Feature Engineering |
-| `numpy` | Numerische Berechnungen, EWA |
-| `scikit-learn` | LogisticRegression, StandardScaler, StratifiedKFold, RandomizedSearchCV, Metriken |
-| `xgboost` | XGBClassifier (Hauptmodell Gradient Boosting) |
-| `matplotlib` / `seaborn` | EDA-Visualisierungen, Konfusionsmatrizen, Radar-Charts |
-| `joblib` | Modell-Persistenz (Cache) |
-| `difflib` | Fuzzy Matching für Teamnamen-Eingaben |
+- **`xx_Notebook/Features_Metriken.md`** – Detaillierte Erklärung aller 34 Features mit Formeln
+- **`utils.py`** – Inline-Kommentare zu allen Funktionen
+- **`predict_spiel.py`** – Docstrings zu allen Helper-Funktionen
+
+---
+
+## 📄 Lizenz & Zitierung
+
+Dieses Projekt entstand im Rahmen einer Bachelorarbeit. Bei Nutzung oder Weiterverwendung bitte entsprechende Zitierung der Arbeit beachten.
