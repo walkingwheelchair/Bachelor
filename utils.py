@@ -194,13 +194,8 @@ def load_bundesliga_data() -> pd.DataFrame:
 
         df["Season"] = _parse_season_label(f)
 
-        # Nur relevante Spalten behalten
-        cols_needed = ["Season", "Date", "HomeTeam", "AwayTeam",
-                       "FTHG", "FTAG", "FTR",
-                       "HS", "AS", "HST", "AST",
-                       "HTHG", "HTAG"]
-        available = [c for c in cols_needed if c in df.columns]
-        df = df[available].dropna(subset=["HomeTeam", "AwayTeam", "FTR"])
+        # Nur Zeilen mit gültigen Teamnamen und Ergebnis entfernen (alle Spalten behalten)
+        df = df.dropna(subset=["HomeTeam", "AwayTeam", "FTR"])
 
         # Teamnamen normalisieren
         df["HomeTeam"] = df["HomeTeam"].apply(normalize_team)

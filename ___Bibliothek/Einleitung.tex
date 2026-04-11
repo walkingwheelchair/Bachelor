@@ -1,0 +1,229 @@
+% =============================================================================
+% EINLEITUNG - BACHELORARBEIT: VORHERSAGE VON BUNDESLIGA-SPIELERGEBNISSEN
+% =============================================================================
+% Diese Einleitung folgt dem Trichter-Prinzip: Vom breiten Themenfeld (Fußball)
+% hin zum spezifischen Forschungsziel (xG-basierte Vorhersagemodelle).
+% Umfang: Ca. 3 Seiten bei Standard-Formatierung (12pt, 1.5-zeilig).
+% =============================================================================
+
+\chapter{Einleitung}
+
+\section{Motivation und Problemstellung}
+
+\subsection{Fußball als globales Phänomen}
+
+Der Fußball gilt zu Recht als die populärste Sportart der Welt. Mit geschätzten 3,5 bis 4 Milliarden Fans weltweit, über 260 Millionen aktiven Spielern und einem globalen Marktvolumen von mehreren hundert Milliarden Euro jährlich hat sich der \glqq schöne Spiel\grqq\ zu einem kulturellen und ökonomischen Phänomen ersten Ranges entwickelt \cite{Szymanski2003,Statista2024}. Von den Straßen Turniers in Favelas bis zu den hochkommerzialisierten Arenen der europäischen Top-Ligen -- Fußball verbindet Menschen unterschiedlichster Herkunft, Sprachen und Kulturen durch eine gemeinsame Leidenschaft.
+
+Die Faszination des Fußballs lässt sich durch mehrere Faktoren erklären. Erstens bietet die geringe Materialanforderung -- im Prinzip genügen ein Ball und zwei provisorische Tore -- eine beispiellose Zugänglichkeit \cite{Goodey2016}. Zweitens erzeugt die einfache Grundregelstruktur bei gleichzeitiger taktischer Komplexität eine einzigartige Spannung \cite{Sumpter2016}. Drittens fungiert Fußball in vielen Gesellschaften als identitätsstiftendes Element: Vereine verkörpern lokale Traditionen, Städte oder soziale Gruppen und werden generationenübergreifend unterstützt \cite{Griggs2017,Müller2019}.
+
+Die wirtschaftliche Bedeutung des Fußballs hat in den letzten drei Jahrzehnten exponentiell zugenommen. Die fünf großen europäischen Ligen (Premier League, La Liga, Bundesliga, Serie A, Ligue 1) generieren gemeinsam Jahresumsätze von über 25 Milliarden Euro \cite{DFL2024}. Transfergebühren für Spieler erreichen astronomische Summen -- der Rekordtransfer von Neymar vom FC Barcelona zu Paris Saint-Germain im Jahr 2017 kostete 222 Millionen Euro. Diese Kommerzialisierung hat den Druck auf Vereine, Spieler und Trainer massiv erhöht: Jede Entscheidung -- von der Kaderzusammenstellung über die Taktik bis hin zur Spielervorhersage -- muss immer häufiger ökonomischen Kriterien standhalten \cite{DobsonGoddard2011}.
+
+\subsection{Die zunehmende Rolle von Daten und Analysen im Sport}
+
+Parallel zur Kommerzialisierung hat im Sport eine stille Revolution stattgefunden: die Digitalisierung und datengetriebene Optimierung. Während traditionelle Entscheidungen im Fußball primär auf Intuition, Erfahrung und \glqq Bauchgefühl\grqq\ basierten, halten zunehmend quantitative Methoden Einzug in die Entscheidungsfindung der Vereine \cite{ReinMemmert2016}. Dieser Wandel ist Teil eines übergeordneten Trends, der unter Begriffen wie \glqq Sports Analytics\grqq, \glqq Moneyball\grqq\ oder \glqq Evidence-Based Coaching\grqq\ firmiert \cite{BunkerThabtah2019}.
+
+Die Pionierarbeit im Bereich datengetriebener Sportanalyse wird häufig der Baseball-Branche zugeschrieben: Das Buch \glqq Moneyball\grqq\ von Michael Lewis (2003) dokumentierte, wie das Oakland Athletics-Team durch systematische Datenanalyse Wettbewerbsvorteile gegenüber finanzstärkeren Konkurrenten erzielte \cite{KuperSzymanski2018}. Im Fußball dauerte diese Revolution etwas länger -- traditionell galt der Sport als zu komplex, zu chaotisch, zu sehr von menschlichen Faktoren geprägt, um sich für quantitative Analysen zu eignen \cite{Goodey2016}. Doch diese Haltung hat sich in den letzten zehn Jahren grundlegend gewandelt.
+
+Moderne Fußballvereine setzen heute auf ganze Abteilungen von Datenanalysten. Der FC Midtjylland aus Dänemark gilt als Vorreiter: Der Verein, der 2014 vom Glücksspiel-Tycoon Matthew Benham übernommen wurde, basiert seine gesamte Spielerauswahl, Taktik und Spielvorbereitung auf statistischen Modellen \cite{Wheatcroft2022}. In der Bundesliga folgt der FC Augsburg einem ähnlichen Ansatz und beschäftigt ein eigenes Data-Science-Team. Auch Top-Klubs wie der FC Bayern München, Liverpool FC und Manchester City investieren Millionen in Analytics-Abteilungen \cite{FIFA2023}.
+
+Die Anwendungsbereiche von Fußball-Analytics sind vielfältig:
+\begin{itemize}
+    \item \textbf{Scouting \& Transfers:} Identifikation von unterbewerteten Spielern, die ins taktische System passen \cite{PappalardoEtAl2019}.
+    \item \textbf{Taktikanalyse:} Auswertung von Spielzügen, Pressing-Intensität und Defensivorganisation \cite{MemmertLemminkSampaio2017}.
+    \item \textbf{Verletzungsprävention:} Vorhersage von Verletzungsrisiken basierend auf Belastungsdaten \cite{Csercsik2020}.
+    \item \textbf{Spielvorhersage:} Prognose von Spielergebnissen für strategische Planung oder Wettindustrie \cite{HubacekSourekZelezny2019}.
+\end{itemize}
+
+\subsection{Die inhärente Unvorhersehbarkeit des Fußballs}
+
+Trotz aller Fortschritte in der Datenanalyse bleibt eine fundamentale Eigenschaft des Fußballs bestehen, die ihn von anderen Sportarten unterscheidet: die hohe Unvorhersehbarkeit der Ergebnisse \cite{DobsonGoddard2011}. Ein Bundesliga-Spiel dauert 90 Minuten -- in dieser Zeit fallen durchschnittlich lediglich 2,86 Tore pro Spiel (Saison 2023/24) \cite{Transfermarkt2024}. Im Vergleich zu anderen Sportarten stellt Fußball damit ein typisches \textbf{Low-Scoring-Event} dar:
+
+\begin{table}[h]
+    \centering
+    \caption{Vergleich der durchschnittlichen Punktzahlen pro Spiel}
+    \label{tab:scoring-comparison}
+    \begin{tabular}{l r}
+        \toprule
+        \textbf{Sportart} & \textbf{Ø Punkte/Spiel} \\
+        \midrule
+        Fußball (Bundesliga) & 2,86 Tore \\
+        Eishockey (NHL) & 6,2 Tore \\
+        American Football (NFL) & 45 Punkte \\
+        Basketball (NBA) & 220 Punkte \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Diese geringe Trefferquote hat weitreichende Konsequenzen für die Vorhersagbarkeit. In Sportarten mit vielen Scoring-Events (wie Basketball) gleicht sich der Zufall über die vielen Punkte aus -- das bessere Team setzt sich mit hoher Wahrscheinlichkeit durch. Im Fußball hingegen kann ein einzelnes Ereignis -- ein abgefälschter Schuss, eine umstrittene Schiedsrichterentscheidung, ein individueller Fehler -- das gesamte Ergebnis verzerren \cite{Sumpter2016}. Diese hohe Varianz macht die Vorhersage von Fußballergebnissen zu einem der anspruchsvollsten Probleme im Bereich des Sports Analytics \cite{GrollLeyEffenberger2019}.
+
+Die Forschung zeigt, dass selbst die ausgefeiltesten statistischen Modelle in der Regel Accuracy-Werte zwischen 50\% und 60\% erreichen -- also nur geringfügig besser als eine einfache Baseline-Prognose \cite{BunkerThabtah2019,HubacekSourekZelezny2019}. Diese Grenze scheint fundamental mit der Natur des Spiels verbunden zu sein. Dennoch: Jede marginale Verbesserung der Vorhersagegenauigkeit kann für Vereine, Wettanbieter oder Medien von erheblichem Wert sein \cite{ForrestSimmons2000}.
+
+\subsection{Von traditionellen Statistiken zu erweiterten Metriken}
+
+Traditionelle Vorhersagemodelle stützten sich primär auf einfach zugängliche Statistiken: \textbf{historische Spielergebnisse}, \textbf{Tabellenpositionen}, \textbf{Tore}, \textbf{Schüsse} und \textbf{Ballbesitz} \cite{DobsonGoddard2011}. Diese Metriken sind zwar nützlich, erfassen jedoch nur oberflächlich, was während eines Spiels tatsächlich geschieht. Ein Team kann dominieren, 20 Schüsse abgeben und dennoch verlieren -- weil der Gegner mit nur zwei Torchancen effizient war. Die Frage nach der \glqq wahren\grqq\ Leistungsstärke eines Teams bleibt unbeantwortet.
+
+Hier setzt die moderne Fußballanalytik an: Mit \textbf{Expected Goals (xG)} wurde eine Metrik entwickelt, die die Qualität von Torchancen quantifiziert und damit eine präzisere Bewertung der Teamleistung ermöglicht \cite{AnzerBauer2021}. xG geht über die reine Zählung von Toren oder Schüssen hinaus und bewertet jede Torchance basierend auf historischen Daten vergleichbarer Situationen. Diese Metrik hat sich in den letzten Jahren als einer der stabilsten Prädiktoren für zukünftige Teamleistung etabliert \cite{WheatcroftVanEetvelde2020}.
+
+\section{Expected Goals -- Eine Revolution der Fußballstatistik}
+
+\subsection{Konzept und Berechnung von Expected Goals}
+
+\textbf{Expected Goals (xG)} ist eine fortgeschrittene Fußballstatistik, die jeder Torchance einen Wahrscheinlichkeitswert zwischen 0 und 1 zuweist \cite{Spearman2018}. Dieser Wert gibt an, mit welcher Wahrscheinlichkeit aus einer gegebenen Spielsituation ein Tor erzielt werden sollte. Die Berechnung basiert auf historischen Daten von zehntausenden vergleichbarer Schusssituationen und berücksichtigt eine Vielzahl von Faktoren:
+
+\begin{itemize}
+    \item \textbf{Schussposition:} Distanz zum Tor und Winkel des Schusses. Ein Schuss aus dem Zentrum des Strafraums hat einen höheren xG-Wert als einer von der Außenbahn.
+    \item \textbf{Körperteil:} Schuss mit dem starken Fuß, schwachen Fuß oder Kopfball. Kopfball-Chancen haben typischerweise niedrigere xG-Werte.
+    \item \textbf{Art der Vorlage:} Flanke, Pass, Solo-Lauf, Abpraller. Direkte Pässe in den Strafraum führen zu höherwertigen Chancen.
+    \item \textbf{Drucksituation:} Anzahl und Position der Verteidiger in der Nähe. Freie Schüsse haben höhere xG-Wert.
+    \item \textbf{Spielzustand:} Führt das Team, liegt es zurück oder steht es unentschieden? Dies beeinflusst die Risikobereitschaft \cite{AnzerBauer2021}.
+\end{itemize}
+
+Die xG-Skala reicht von 0 (keine erkennbare Torchance) bis 1 (eine hundertprozentige Chance). Ein Penalty erhält beispielsweise einen xG-Wert von etwa 0,76 -- aus 100 Elfmetern werden im Durchschnitt 76 verwandelt \cite{PalmerEtAl2021}. Eine Halbchance von außerhalb des Strafraums hingegen hat vielleicht nur einen Wert von 0,08 -- aus 100 solchen Situationen würden im Durchschnitt acht Tore resultieren.
+
+Die Summe aller xG-Werte eines Spiels ergibt die \textbf{erwarteten Tore} (Expected Goals) eines Teams. Diese Metrik ist deutlich stabiler als die tatsächliche Toranzahl, da sie Glück und Pech bei der Chancenverwertung sowie überragende oder schwache Torwartleistungen herausrechnet \cite{Wheatcroft2022}. Ein Team, das über mehrere Spiele hinweg konstant höhere xG-Werte als die Gegner erzielt, wird langfristig auch erfolgreich sein -- selbst wenn es in einzelnen Spielen durch Zufall verliert \cite{LiuEtAl2023}.
+
+\subsection{Warum xG traditionelle Statistiken übertrifft}
+
+Die wissenschaftliche Literatur zeigt zunehmend, dass xG-basierte Modelle traditionelle Statistiken in der Vorhersagekraft übertreffen. \citet{WheatcroftVanEetvelde2020} demonstrierten in einer umfassenden Studie, dass xG die Teamstärke präziser abbildet als die reine Tordifferenz. Der entscheidende Vorteil liegt in der größeren Stichprobe: Während Tore selten sind (ca. 2,86 pro Spiel), gibt es in jedem Spiel zahlreiche Torchancen (typischerweise 10--20 pro Team). Dies ermöglicht eine statistisch robustere Bewertung \cite{AnzerBauer2021}.
+
+\citet{LiuEtAl2023} zeigten in einer detaillierten Analyse der englischen Premier League, dass Teams mit konsistent höherer xG-Performance auch langfristig erfolgreicher abschnitten. Die Studie identifizierte mehrere Teams, die in der Tabelle überperformten -- also mehr Punkte holten als ihr xG nahelegte -- und andere, die unterperformten. Über mehrere Saisons hinweg tendierten alle Teams zur Regression zum Mittelwert: Die tatsächlichen Punkte näherten sich den aus xG erwarteten Punkten an. Dies ist ein starker Indikator dafür, dass xG \textbf{nachhaltigen Erfolg} besser prognostiziert als kurzfristige Ergebnisschwankungen \cite{Sumpter2016,VanEetveldeEtAl2024}.
+
+Ein praktisches Beispiel: In der Saison 2015/16 wurde Leicester City überraschend englischer Meister. Die traditionelle Tabelle spiegelte diesen Erfolg wider. Die xG-Statistiken zeigten jedoch, dass Leicester deutlich überperformte -- das Team erzielte mehr Tore als erwartet und kassierte weniger. In den folgenden Saisons pendelte sich Leicester auf einem niedrigeren, aber ihrem xG entsprechenden Niveau ein \cite{Wheatcroft2022}. Für Analysten war dies ein klares Signal: Der Meistertitel war teilweise durch Glück und überragende Torwartleistung begünstigt, nicht allein durch nachhaltige Überlegenheit.
+
+\section{Machine Learning im Fußball -- Stand der Forschung}
+
+\subsection{Historische Entwicklung der Vorhersagemodelle}
+
+Die Anwendung von Machine-Learning-Algorithmen zur Vorhersage von Fußballergebnissen hat in den letzten Jahren erheblich an Bedeutung gewonnen. Die wissenschaftliche Beschäftigung mit Fußballvorhersagen reicht jedoch weiter zurück. Der Grundstein wurde bereits 1982 von \citet{Maher1982} gelegt, der ein statistisches Modell auf Basis der \textbf{Poisson-Regression} entwickelte. Dieses Modell nimmt an, dass die Anzahl der Tore pro Team einer Poisson-Verteilung folgt -- einer Wahrscheinlichkeitsverteilung für seltene Ereignisse \cite{DobsonGoddard2011}.
+
+\citet{DixonColes1997} erweiterten Mahers Ansatz um eine Korrektur für die beobachtete Tendenz zu mehr Unentschiedenen bei eng anliegenden Spielen. \citet{KarlisNtzoufras2003} führten bivariate Poisson-Modelle ein, die die gegenseitige Abhängigkeit der Tore beider Teams berücksichtigen. Diese klassischen statistischen Ansätze bilden bis heute die Basis vieler Vorhersagemodelle und erreichen beachtliche Genauigkeiten \cite{McHaleScarf2007}.
+
+Doch in den letzten zehn Jahren hat sich das Feld gewandelt: Machine-Learning-Algorithmen, die in der Lage sind, komplexe nicht-lineare Zusammenhänge zu erfassen, dominieren zunehmend die Forschung \cite{BunkerThabtah2019}.
+
+\subsection{Moderne Machine-Learning-Algorithmen}
+
+Heute kommt eine Vielzahl von Algorithmen zum Einsatz, die sich in ihrer Komplexität und ihren Stärken unterscheiden:
+
+\begin{table}[h]
+    \centering
+    \caption{Machine-Learning-Algorithmen zur Fußballvorhersage im Vergleich}
+    \label{tab:ml-algorithmen}
+    \begin{tabular}{p{3.5cm} p{4.5cm} p{4cm}}
+        \toprule
+        \textbf{Algorithmus} & \textbf{Typische Anwendung} & \textbf{Stärken} \\
+        \midrule
+        Logistische Regression & Baseline-Modell, interpretierbar & Schnell, stabil, gut kalibrierte Wahrscheinlichkeiten \\
+        Random Forest & Ensemble-Methode für Klassifikation & Robust gegenüber Overfitting, Feature-Importance \\
+        XGBoost & Gradient Boosting & State-of-the-Art für tabellarische Daten, hohe Präzision \\
+        LightGBM & Gradient Boosting (effizient) & Schnell, speichereffizient, für große Datensätze \\
+        Neuronale Netze (MLP) & Nicht-lineare Mustererkennung & Erfasst komplexe Feature-Interaktionen \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Studien zeigen, dass insbesondere \textbf{Gradient-Boosting-Verfahren} wie XGBoost und LightGBM in der Lage sind, nicht-lineare Zusammenhänge zwischen Spielstatistiken und Ergebnissen zu erfassen, die traditionelle Modelle übersehen \cite{KeEtAl2017}. Ein entscheidender Vorteil dieser Algorithmen liegt in ihrer Fähigkeit, \textbf{Feature-Interaktionen} automatisch zu lernen -- beispielsweise, dass die Kombination aus hoher Heimform und schwacher Auswärtsform des Gegners eine stärkere Prädiktion darstellt als die Summe der Einzeleffekte \cite{LundbergLee2017}.
+
+\citet{GrollLeyEffenberger2019} verglichen verschiedene Machine-Learning-Ansätze zur Vorhersage der FIFA Weltmeisterschaft 2018 und kamen zum Ergebnis, dass Ensemble-Methoden und Gradient-Boosting-Verfahren den klassischen Poisson-Modellen überlegen waren. \citet{HubacekSourekZelezny2019} entwickelten ein Modell auf Basis von Gradient Boosted Trees für die englische Premier League und erreichten eine Accuracy von über 55\% -- ein Wert, der signifikant über der Baseline liegt. Aktuelle Studien bestätigen diese Ergebnisse auch für andere europäische Ligen \cite{JohndrowEtAl2023,SiegleEtAl2023,LeitnerZeileis2024}.
+
+\subsection{Forschungslücke: Expected Goals in der Bundesliga}
+
+Trotz dieser Fortschritte bleibt eine zentrale Frage weitgehend unbeantwortet: \textbf{Inwieweit verbessert die Integration von Expected-Goals-Daten die Vorhersagegenauigkeit von Machine-Learning-Modellen für Bundesliga-Spielergebnisse?}
+
+Während einzelne Studien dies für die Premier League \cite{HubacekSourekZelezny2019}, die spanische La Liga \cite{PappalardoEtAl2019} oder allgemeine europäische Wettbewerbe \cite{VanEetveldeEtAl2024} untersuchten, fehlt eine umfassende Analyse für die deutsche Bundesliga. Dies ist bemerkenswert, da die Bundesliga eigene Charakteristika aufweist, die sie von anderen europäischen Top-Ligen unterscheiden:
+
+\begin{itemize}
+    \item \textbf{Hohe Tordichte:} Die Bundesliga hat traditionell eine der höchsten Torquoten unter den europäischen Top-Ligen \cite{Transfermarkt2024}.
+    \item \textbf{Intensives Pressing:} Deutsche Teams sind bekannt für aggressives Gegenpressing und hohe Laufleistungen \cite{ReinMemmert2016}.
+    \item \textbf{Taktische Vielfalt:} Von der defensiven Ausrichtung kleinerer Vereine bis zum Possession-Spiel der Top-Teams bietet die Bundesliga ein breites taktisches Spektrum.
+    \item \textbf{50+1-Regel:} Die besondere Eigentümerstruktur der meisten Bundesliga-Vereine (Mitglieder besitzen die Stimmrechtsmehrheit) schafft ein anderes ökonomisches Umfeld als in England oder Frankreich \cite{Müller2019}.
+\end{itemize}
+
+Diese liga-spezifischen Charakteristika könnten dazu führen, dass Modelle, die für die Premier League entwickelt wurden, nicht ohne Weiteres auf die Bundesliga übertragbar sind. Eine systematische Validierung für den deutschen Kontext fehlt bisher -- eine Lücke, die diese Arbeit schließt.
+
+\section{Zielsetzung und Forschungsfrage}
+
+\subsection{Übergeordnetes Forschungsziel}
+
+Diese Bachelorarbeit verfolgt das Ziel, die \textbf{Vorhersagegenauigkeit von Machine-Learning-Modellen für Bundesliga-Spielergebnisse} durch die systematische Integration von Expected-Goals-Daten zu verbessern. Im Zentrum steht die Frage, ob und in welchem Umfang xG-Metriken die Prädiktionsleistung von etablierten Machine-Learning-Algorithmen steigern können.
+
+Die zentrale Forschungsfrage lautet:
+
+\begin{quote}
+    \textbf{Verbessert die Integration von Expected-Goals-Daten (xG) die Vorhersagegenauigkeit eines Machine-Learning-Modells für Bundesliga-Spielergebnisse signifikant?}
+\end{quote}
+
+Diese Hauptfrage lässt sich in drei Teilfragen zerlegen:
+
+\begin{enumerate}
+    \item Welche xG-basierten Features sind die stärksten Prädiktoren für Spielergebnisse?
+    \item Welche Machine-Learning-Algorithmen erreichen die beste Vorhersagegenauigkeit?
+    \item Wie robust sind die Modelle gegenüber Datenproblemen wie Ausreißern und Klassen-Imbalance?
+\end{enumerate}
+
+\subsection{Konkrete Teilziele}
+
+Zur Beantwortung der Forschungsfrage werden folgende \textbf{Teilziele} verfolgt:
+
+\begin{enumerate}
+    \item \textbf{Datenaufbereitung:} Sammlung und Aufbereitung historischer Bundesliga-Spieldaten (10 Saisons, 2016/17--2025/26) sowie korrespondierender xG-Statistiken \cite{Understat2024}. Dies umfasst die Bereinigung von Datenfehlern, die Normalisierung von Teamnamen und die Sicherstellung der zeitlichen Konsistenz.
+
+    \item \textbf{Feature-Engineering:} Entwicklung eines umfassenden Feature-Sets auf Basis von \textbf{Exponentially Weighted Averages (EWA)} zur Erfassung der Teamform \cite{HyndmanAthanasopoulos2021}. EWA berechnet einen gleitenden Durchschnitt, bei dem neuere Spiele stärker gewichtet werden -- eine Methode, die der dynamischen Natur von Sportform besser gerecht wird als einfache Durchschnitte \cite{Brown1956}. Das Feature-Set umfasst:
+    \begin{itemize}
+        \item EWA-basierte Form-Metriken (Tore, Punkte, Schüsse)
+        \item Heim- und Auswärtsform separat
+        \item xG-basierte Leistungsindikatoren
+        \item Differenz-Features für den direkten Teamvergleich
+    \end{itemize}
+
+    \item \textbf{Modellentwicklung:} Implementierung und Training von fünf Machine-Learning-Algorithmen (Logistische Regression, Random Forest, LightGBM, XGBoost, MLP) auf zwei Datensatz-Varianten:
+    \begin{itemize}
+        \item \textbf{Ohne xG:} 25 Basis-Features (historische Form, Heim/Auswärts-Stärke, Differenz-Features)
+        \item \textbf{Mit xG:} 34 Features (zusätzlich 9 xG-basierte Merkmale) \cite{ScikitLearn2024}
+    \end{itemize}
+
+    \item \textbf{Evaluation:} Systematischer Vergleich der Modellperformance mittels \textbf{Accuracy}, \textbf{F1-Score}, \textbf{Log Loss} und \textbf{Konfusionsmatrizen} \cite{Powers2020}. Besondere Aufmerksamkeit gilt der Vorhersage der schwierigsten Klasse -- des Unentschiedens, das nur etwa 25\% aller Spiele ausmacht und von den meisten Modellen systematisch unterrepräsentiert wird \cite{HeGarcia2009}.
+
+    \item \textbf{Praktische Anwendung:} Entwicklung eines interaktiven Vorhersagetools (\texttt{predict\_spiel.py}), das Live-Prognosen für bevorstehende Bundesliga-Spiele ermöglicht \cite{Python2024}. Dieses Tool demonstriert die praktische Anwendbarkeit der entwickelten Modelle.
+\end{enumerate}
+
+\section{Wissenschaftlicher Beitrag und Relevanz}
+
+\subsection{Wissenschaftliche Relevanz}
+
+Diese Arbeit leistet einen Beitrag zur noch jungen, aber rasch wachsenden Disziplin des \textbf{Football Analytics}. Die wissenschaftliche Relevanz ergibt sich aus mehreren Aspekten:
+
+\textbf{Erstens} bietet sie eine der ersten umfassenden Analysen zur Vorhersagekraft von xG in der Bundesliga. Während internationale Studien bereits die Überlegenheit von xG-basierten Modellen nahelegen \cite{VanEetveldeLeySchaerken2021,VanEetveldeEtAl2024}, fehlt bisher eine liga-spezifische Validierung für Deutschland. Die vorliegende Arbeit schließt diese Lücke durch eine systematische Evaluation an einem Datensatz von über 2.900 Bundesliga-Spielen \cite{ReepBenjamin2022,SiegleEtAl2023}.
+
+\textbf{Zweitens} demonstriert sie die praktische Anwendbarkeit moderner Machine-Learning-Verfahren im Sportkontext. Durch die Kombination aus \textbf{EWA-basiertem Feature-Engineering} und \textbf{Gradient-Boosting-Algorithmen} entsteht ein Modell, das nicht nur akademisch interessant, sondern auch praktisch nutzbar ist \cite{BunkerThabtah2019,JamesEtAl2021}. Die Arbeit zeigt konkret, wie theoretische Konzepte aus der Zeitreihenanalyse und dem maschinellen Lernen in einer realen Anwendung kombiniert werden können.
+
+\textbf{Drittens} adressiert die Arbeit das Problem der \textbf{Klassen-Imbalance} bei der Vorhersage von Fußballergebnissen. Da Unentschieden die seltenste Klasse darstellen ($\sim$25\% aller Spiele), entwickeln viele Modelle eine systematische Schwäche bei deren Vorhersage \cite{JapkowiczStephen2002}. Durch spezielle Features wie \texttt{combined\_draw\_tendency} und klassen-gewichtetes Training wird diesem Problem begegnet \cite{ChawlaEtAl2002}. Die Arbeit liefert damit auch methodische Erkenntnisse für andere Klassifikationsprobleme mit unausgewogenen Klassenverteilungen.
+
+\textbf{Viertens} legt die Arbeit besonderen Wert auf die Vermeidung von \textbf{Data Leakage} -- einem häufigen Problem in der Sportvorhersage, bei dem Informationen aus der Zukunft unbeabsichtigt in die Vorhersage einfließen \cite{KaufmanRossetPerlich2012}. Durch den konsequenten Einsatz des Lag-1-Ansatzes (nur vergangene Daten für Vorhersagen) setzt die Arbeit einen methodischen Standard, der in ähnlichen Studien häufig vernachlässigt wird.
+
+\subsection{Praktische Relevanz}
+
+Die \textbf{praktische Relevanz} der Arbeit erstreckt sich auf mehrere Stakeholder-Gruppen:
+
+\begin{itemize}
+    \item \textbf{Vereine \& Scouting:} Verbesserte Spielvorhersagen können als Basis für taktische Analysen und Gegner-Scouting dienen \cite{MemmertLemminkSampaio2017}. Ein Modell, das die Wahrscheinlichkeit verschiedener Spielergebnisse präzise vorhersagt, unterstützt Trainer bei der Spielvorbereitung und Spielerauswahl.
+
+    \item \textbf{Wettindustrie:} Präzisere Modelle sind von direktem wirtschaftlichem Wert für Wettanbieter und professionelle Wetter \cite{ForrestSimmons2000}. Der globale Sportwetten-Markt wird bis 2030 auf über 250 Milliarden US-Dollar geschätzt \cite{Grand_View_Research_2024}. Selbst marginale Verbesserungen der Vorhersagegenauigkeit können hier erhebliche finanzielle Auswirkungen haben.
+
+    \item \textbf{Medien \& Fans:} Interaktive Vorhersagetools erhöhen das Fan-Engagement und bieten neue Perspektiven auf bevorstehende Spiele \cite{Hutchins2016,Billings2016}. Medienhäuser können solche Tools nutzen, um ihre Berichterstattung zu bereichern und Fans in die Analyse einzubinden.
+
+    \item \textbf{Forschung:} Die in dieser Arbeit entwickelte Methodik kann als Grundlage für zukünftige Studien dienen -- sei es für andere Fußball-Ligen, andere Sportarten oder erweiterte Vorhersageziele (z.B. genaue Ergebnisvorhersage, Spieler-Performance).
+\end{itemize}
+
+\section{Aufbau der Arbeit}
+
+Die vorliegende Arbeit ist wie folgt strukturiert:
+
+\textbf{Kapitel 2 (Grundlagen)} führt in die theoretischen Konzepte ein. Nach einer detaillierten Erläuterung von Expected Goals und verwandten fortgeschrittenen Fußballmetriken werden die eingesetzten Machine-Learning-Algorithmen vorgestellt. Ein Überblick über verwandte Arbeiten im Bereich Football Analytics rundet das Kapitel ab.
+
+\textbf{Kapitel 3 (Methodik)} beschreibt die Datenerhebung, das Feature-Engineering (inklusive EWA-Berechnung und xG-Integration) sowie die Implementierung der Machine-Learning-Pipeline. Besonderes Augenmerk gilt der Vermeidung von \textbf{Data Leakage} durch den Lag-1-Ansatz \cite{KaufmanRossetPerlich2012}. Die methodischen Entscheidungen werden ausführlich begründet.
+
+\textbf{Kapitel 4 (Ergebnisse)} präsentiert die Evaluationsresultate aller Modellvarianten. Neben klassischen Metriken wie Accuracy und F1-Score werden detaillierte Analysen zu Konfusionsmatrizen, Feature-Importance und Modellkalibrierung durchgeführt. Die Ergebnisse werden im Kontext der Forschungsfrage interpretiert.
+
+\textbf{Kapitel 5 (Diskussion)} ordnet die Ergebnisse in den wissenschaftlichen Kontext ein, diskutiert Limitationen (z.\,B. fehlende In-Game-xG-Daten, Verletzungen, Trainerwechsel) und gibt Empfehlungen für zukünftige Forschung \cite{VercruyssenImpeDavis2020}.
+
+\textbf{Kapitel 6 (Fazit)} fasst die zentralen Erkenntnisse zusammen, beantwortet die Forschungsfrage und zieht ein kritisches Resümee der durchgeführten Arbeit.

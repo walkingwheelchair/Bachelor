@@ -1,3 +1,0 @@
-Modell,Accuracy,Log_Loss,Variante
-Logistic Regression,0.4906,1.0129,mit_xG
-XGBoost,0.4562,1.1809,mit_xG
