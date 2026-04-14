@@ -1,0 +1,130 @@
+% =============================================================================
+% KAPITEL 3: RELATED WORK
+% =============================================================================
+% Dieses Kapitel gibt einen Überblick über den aktuellen Stand der Forschung zur
+% Vorhersage von Fußballspielergebnissen mittels Machine Learning. Es werden
+% relevante Studien vorgestellt, verwendete Methoden verglichen und Forschungs-
+% lücken identifiziert, die diese Arbeit adressiert.
+% =============================================================================
+
+\chapter{Related Work}\label{chap:relatedwork}
+
+Dieses Kapitel reviewt den aktuellen Forschungsstand zur spielbasierten Vorhersage von Fußballergebnissen. Abschnitt 3.1 beleuchtet systematische Übersichtsarbeiten, Abschnitt 3.2 diskutiert neuronale Netzwerke im Sportkontext. Abschnitt 3.3 betrachtet Expected-Possession-Value-Ansätze, Abschnitt 3.4 eine datengetriebene Framework-Studie. Abschnitt 3.5 fasst zusammen und leitet zur eigenen Methodik über.
+
+\section{Systematische Übersichtsarbeiten zum Stand der Forschung}
+\label{sec:systematic-reviews}
+
+Die Anwendung von Machine Learning im Fußball hat in den letzten Jahren erheblich an Bedeutung gewonnen. \citet{Bunker2017} entwickelten mit \textbf{SRP-CRISP-DM} einen adaptierten Prozessstandard für Sportvorhersagen, der auf einer kritischen Analyse bestehender ANN-basierter Ansätze basiert. Ihre zentrale Erkenntnis: \textbf{Kreuzvalidierung ist für zeitlich geordnete Sportdaten ungeeignet} -- eine methodische Einsicht, die für die vorliegende Arbeit relevant ist. Die Autoren identifizierten historische Spieldaten, Spielerperformance-Metriken und Wettquoten als dominante Feature-Kategorien.
+
+\citet{DubitzkyEtAl2024} analysierten 190 peer-reviewte Studien und klassifizierten KI-Anwendungen im Fußball in neun Anwendungsbereiche. Match-Outcome-Prediction bleibt demnach eine der am intensivsten beforschten Domänen. Bemerkenswert: \textbf{Matchvorhersage-Genauigkeit bleibt systematisch niedrig} -- viele Studien entfernen Unentschieden künstlich, was Accuracy-Werte inflatiert. In der realen 3-Klassen-Vorhersage (Heimsieg, Unentschieden, Auswärtssieg) erreichen selbst State-of-the-Art-Modelle selten über 60\% Accuracy \cite{DobsonGoddard2011,HubacekSourekZelezny2019}.
+
+Die \textbf{2017er und 2023er Soccer Prediction Challenges} \cite{Constantinou2018,YeungEtAl2024} etablierten mit dem \textbf{Ranked Probability Score (RPS)} einen standardisierten Evaluationsmetrik. Das \textbf{Dolores-Modell} \cite{Constantinou2018} kombinierte dynamische Teamratings mit Hybrid-Bayesian-Networks und erreichte RPS~=~0,2083 auf 216.743 Matches aus 52 Ligen. Aktuelle Challenge-Beiträge zeigen: \textbf{Einfache Algorithmen wie k-NN performen überraschend stark}, wenn Domänenwissen (z.B.\ pi-Ratings) integriert wird \cite{YeungEtAl2024}.
+
+\citet{WeirichEtAl2025} verglichen im NFL-Kontext Pythagorean-Expectation-Modelle mit Random Forest und neuronalen Netzen über 21 Saisons (672 Team-Saison-Beobachtungen). Das Neural Network erreichte die beste Performance (MAE~=~0,052, R²~=~0,891) -- ein Beleg, dass Deep Learning auch im Sportkontext tabellarischer Daten überlegen sein kann. Top-Prädiktoren waren erzielte Punkte (54\% Importance) und kassierte Punkte (34\%). Diese Erkenntnis ist auf den Fußball übertragbar: Tore bzw.\ xG-Werte sollten analog dominierende Prädiktoren sein.
+
+\section{Neuronale Netzwerke für die Spielvorhersage}
+\label{sec:neuronale-netze}
+
+\textbf{Multilayer Perceptrons} (MLP) zählen zu den am häufigsten eingesetzten Deep-Learning-Architekturen für die Fußballvorhersage. \citet{LuoEtAl2025} entwickelten ein 24-4-3-MLP zur Vorhersage von FIFA-World-Cup-Ergebnissen basierend auf 22 technischen Statistikindikatoren (TSI). Das Modell erreichte eine \textbf{Gesamtaccuracy von 86,7\%} -- wobei Unentschieden systematisch schlechter vorhergesagt wurden (Win/Loss: hoch; Draw: deutlich niedriger). Feature-Importance-Analysen identifizierten \textbf{kassierte Tore (100\%), erzielte Tore (55\%) und Assists (50\%)} als einflussreichste Prädiktoren. PCA wurde zur Dimensionsreduktion eingesetzt.
+
+\citet{Rahman2019} evaluierten \textbf{LSTM-basierte Deep-Learning-Architekturen} für die FIFA-World-Cup-2018-Vorhersage und erreichten 63,3\% Accuracy in der Gruppenphase. Die sequenzielle Modellierung von Teamform über Zeitreihen hinweg erwies sich als vorteilhaft gegenüber statischen Features.
+
+\citet{Bunker2017} betonten in ihrem kritischen Review, dass \textbf{ANNs dominieren}, wenn reine Vorhersagegenauigkeit das Ziel ist -- allerdings auf Kosten von Interpretierbarkeit und höherem Rechenaufwand. Für die vorliegende Arbeit ist diese Trade-off-Entscheidung relevant: MLP wird als repräsentativer Deep-Learning-Ansatz evaluiert, obwohl Ensemble-Methoden (XGBoost, LightGBM) bei tabellarischen Daten oft effizienter sind \cite{Shwartz-ZivAramon2020}.
+
+\citet{Sumpter2016} argumentierte früh, dass neuronale Netze aufgrund ihrer Fähigkeit zur Modellierung nicht-linearer Zusammenhänge besonders geeignet für Fußballdaten sind. Die \glqq emergenten Phänomene\grqq{} des Fußballs -- also Ergebniszustände, die aus komplexen Interaktionen einzelner Spieleraktionen entstehen -- lassen sich mit linearen Modellen nur unzureichend abbilden. Allerdings warnte er auch vor \textbf{Overfitting bei kleinen Datensätzen}: Mit nur $\sim$306 Spielen pro Bundesliga-Saison ist die Datenmenge begrenzt, was Deep-Learning-Modelle anfällig für Overfitting macht. Regularisierungstechniken (Dropout, L2, Early Stopping) sind daher essenziell \cite{GoodfellowEtAl2016,SrivastavaEtAl2014}.
+
+\section{Expected Possession Value vs.\ Expected Goals}
+\label{sec:epv-vs-xg}
+
+Eine aktuelle Studie von \citet{ForcherEtAl2025} verglich direkt \textbf{xG- und EPV-basierte Vorhersagemodelle} für die Bundesliga -- ein für diese Arbeit hochrelevanter Kontext. Die Autoren trainierten \textbf{XGBoost- und Random-Forest-Regressionsmodelle} auf 918 Bundesliga-Spielen (Saisons 2022/23 bis 2024/25) und nutzten eine doppelte Poisson-Verteilung zur Ergebnissimulation.
+
+Die zentralen Befunde:
+\begin{itemize}
+    \item \textbf{Post-Match:} xG performte besser (RPS~=~0,148, Accuracy~=~0,656) als EPV (RPS~=~0,191, Accuracy~=~0,596).
+    \item \textbf{Pre-Match:} EPV war überlegen (RPS~=~0,194, Accuracy~=~0,583) gegenüber xG (RPS~=~0,199, Accuracy~=~0,556).
+    \item \textbf{Features:} Gegnerstärke, Spielort und aktuelle Form waren die einflussreichsten Prädiktoren.
+\end{itemize}
+
+Die Interpretation der Autoren: \textbf{xG enthält mehr performanzrelevante Information \textit{nach} dem Spiel}, was es für objektive Leistungsanalysen wertvoll macht. \textbf{EPV hingegen erfasst taktische Nuancen \textit{vor} dem Spiel} besser, da es Possession-Verläufe und Spielzustände modelliert.
+
+\citet{FernandezEtAl2021} entwickelten ein \textbf{EPV-Framework mit SoccerMap} -- einem Fully Convolutional Neural Network -- das auf 633 EPL-Spielen (2013--2015) trainiert wurde. Ihr Ansatz dekomponiert EPV in pass-, ball-drive- und shot-spezifische Subkomponenten und erreicht \textbf{89 Beispiele pro Sekunde} (89× schneller als 10Hz-Trackingdaten), was Echtzeitanwendungen ermöglicht. Die Modelle waren gut kalibriert (niedriger Expected Calibration Error).
+
+Für die vorliegende Arbeit ist dieser Befund ambivalent: Während \citet{ForcherEtAl2025} zeigen, dass xG für \textit{Post-Match}-Analysen überlegen ist, basiert die eigene Methodik auf \textbf{Pre-Match-Vorhersagen}. Da jedoch keine EPV-Daten verfügbar waren und Understat-xG \cite{Understat2024} eine breitere Datenbasis bietet, wird in dieser Arbeit der xG-Ansatz verfolgt -- gestützt durch die Evidenz, dass xG-Features die Vorhersagegenauigkeit signifikant verbessern \cite{AnzerBauer2021,VanEetveldeEtAl2024}.
+
+\citet{Wheatcroft2022} analysierte die historische Entwicklung von xG-Modellen in drei Phasen: Prä-xG-Ära (vor 2010), Entstehungsphase (2010--2015, logistische Regression) und modernes xG (seit 2015, Gradient Boosting mit AUC~$>$~0,85). Moderne xG-Modelle integrieren geometrische Features (Distanz, Winkel), Körperteil, Vorlagentyp und Druckfaktoren \cite{AnzerBauer2021,BauerEpstein2023}. Die \textbf{Limitationen} umfassen Modell-Abhängigkeit (kein Goldstandard), fehlende Kontextdaten bei öffentlichen Modellen und Liga-Spezifität \cite{Wheatcroft2022}. Für die Bundesliga bedeutet dies: xG-Modelle, die auf EPL-Daten trainiert wurden, können aufgrund unterschiedlicher Spielstile (höhere Torrate in der Bundesliga) suboptimal performen -- eine Motivation für die Verwendung von Understat-Daten, die ligaspezifisch kalibriert sind.
+
+\citet{VanEetveldeEtAl2024} demonstrierten, dass \textbf{xGA (Expected Goals Against)} die defensive Stabilität robuster misst als kassierte Tore, da es Glück/Pech in der Torhüterperformance herausrechnet. Diese Erkenntnis untermauert die Verwendung von xG-basierten Features in der vorliegenden Arbeit: Exponentiell geglättete xG/xGA-Durchschnitte (EWA) der letzten 5 Spiele erfassen die aktuelle Teamform präziser als reine Torstatistiken.
+
+\section{Datengetriebene Framework-Studien}
+\label{sec:data-driven-frameworks}
+
+\citet{MillsEtAl2024} präsentierten ein umfassendes Framework zur Vorhersage von Spielergebnissen, das auf 5.329 Matches aus der niederländischen Eredivisie, der belgischen Jupiler Pro League und der Scottish Premiership trainiert wurde (2017--2024). Sie evaluierten sieben Modelle: Logistische Regression, XGBoost, Random Forest, SVM, Naive Bayes, \textbf{Feedforward Neural Network (FNN)} und Vanilla RNN.
+
+Die zentralen Ergebnisse:
+\begin{itemize}
+    \item \textbf{Match Result (Win/Draw/Loss):} FNN erreichte die höchste Einzel-Model-Accuracy (0,73).
+    \item \textbf{Under/Over 2,5 Tore:} Logistische Regression war überlegen (0,78).
+    \item \textbf{Voting-Ensemble (XGBoost + Random Forest):} Erreichte \textbf{0,83--0,84 Accuracy} -- ein Beleg für die Überlegenheit von Ensemble-Methoden.
+\end{itemize}
+
+Das Framework integrierte \textbf{28 engineered Features} in vier Kategorien:
+\begin{enumerate}
+    \item \textbf{Real-time Features:} Halbzeitresultate, Halbzeittore (noveller Beitrag).
+    \item \textbf{Team-Performance:} Home/Away Team State, Attack Strength, Win/Loss/Draw-Raten.
+    \item \textbf{Wettquoten:} Home/Draw/Away-Odds (unter den Top-5-Feature-Importances).
+    \item \textbf{Historische Form:} Goal Differentials, Recent-Form-Fenster.
+\end{enumerate}
+
+Feature-Importance-Analysen (XGBoost) identifizierten \textbf{Halbzeitresultat (0,0922)}, \textbf{Heimsieg-Quote (0,0786)} und \textbf{Auswärtssieg-Quote (0,0757)} als einflussreichste Prädiktoren. Bemerkenswert: Diese Studie verwendete \textbf{keine xG-Features}, sondern basierte ausschließlich auf tatsächlichen Toren und abgeleiteten Metriken. Data-Augmentation-Techniken (SVM-SMOTE, Near-Miss, Random-OverSampling) adressierten Klassen-Imbalance.
+
+Für die vorliegende Arbeit sind drei Erkenntnisse relevant: (1)~Ensemble-Methoden übertreffen Einzelmodelle konsistent, (2)~Wettquoten enthalten signifikante prädiktive Information -- deren Nutzung ist jedoch aus lizenzrechtlichen Gründen oft eingeschränkt, (3)~xG-Features wurden nicht evaluiert, was eine Forschungslücke für die Bundesliga darstellt.
+
+\citet{RibeiroEtAl2025} untersuchten einen \textbf{Bayesianischen Ansatz} zur Vorhersage der brasilianischen Meisterschaft 2022 (380 Matches). Zehn Poisson-Regressionsvarianten wurden evaluiert, darunter hierarchische, zero-inflated und dynamische Modelle. Das \textbf{Dynamic Zero-Inflated Poisson (ZIP)}-Modell erreichte die beste Performance (de-Finetti-Maß: 0,5988, $\sim$50\% korrekte Vorhersagen). Als Kovariate wurde der \textbf{Kaderwert (monetär)} integriert -- ein Feature-Typ, der in europäischen Studien seltener betrachtet wird. Die Autoren betonten, dass Bayesianische Modelle besonders bei kleinen Datensätzen vorteilhaft sind, da sie \textbf{Prior-Wissen} (z.B.\ historische Teamstärke) einbeziehen können. Für die Bundesliga mit $\sim$2.900 Spielen über mehrere Saisons ist dieser Vorteil weniger ausgeprägt, dennoch bietet der Bayesianische Ansatz interpretierbare Unsicherheitsquantifizierungen, die für probabilistische Vorhersagen wertvoll sind \cite{DobsonGoddard2011}.
+
+\section{Zusammenfassung und Forschungsbedarf}
+\label{sec:zusammenfassung-related-work}
+
+Tabelle~\ref{tab:related-work-uebersicht} fasst die reviewten Studien zusammen.
+
+\begin{table}[h]
+    \centering
+    \caption{Übersicht der reviewten Related-Work-Studien}
+    \label{tab:related-work-uebersicht}
+    \begin{tabular}{p{2,8cm} p{3,2cm} p{2,8cm} p{3,5cm}}
+        \toprule
+        \textbf{Studie} & \textbf{Modelle} & \textbf{Accuracy/RPS} & \textbf{Features} \\
+        \midrule
+        Bunker (2017) & ANN & -- & Historische Matches, Performance \\
+        Constantinou (2018) & Bayesian Network & RPS 0,2083 & Dynamische Ratings, 52 Ligen \\
+        Fernandez et al. (2021) & CNN (SoccerMap) & -- (kalibriert) & Trackingdaten (10Hz), EPV \\
+        Luo et al. (2025) & MLP (24-4-3) & 86,7\% & 22 TSI, PCA \\
+        Forcher et al. (2025) & XGBoost, RF & 0,656 (xG), 0,583 (EPV) & xG, EPV, Gegnerstärke \\
+        Mills et al. (2024) & FNN, Voting & 0,73 (FNN), 0,84 (Voting) & 28 Features, Odds, Form \\
+        Ribeiro et al. (2025) & Poisson (ZIP) & $\sim$50\% & Kaderwert (monetär) \\
+        Weirich et al. (2025) & Neural Network & R² 0,891 & Punkte scored/allowed \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Aus den reviewten Studien lassen sich \textbf{fünf übergreifende Erkenntnisse} ableiten:
+\begin{enumerate}
+    \item \textbf{Ensemble-Methoden übertreffen Einzelmodelle:} Voting-Ensembles (XGBoost + Random Forest) erreichen konsistent höhere Accuracy als einzelne Modelle \cite{MillsEtAl2024,HubacekSourekZelezny2019}.
+    \item \textbf{Deep Learning ist datenhungrig:} MLPs und LSTMs benötigen große Datensätze; bei begrenzten Daten (wie der Bundesliga mit $\sim$306 Spielen/Saison) droht Overfitting \cite{Sumpter2016,GoodfellowEtAl2016}.
+    \item \textbf{xG hat prädiktiven Wert:} Studien belegen, dass xG-Features die Vorhersagegenauigkeit signifikant verbessern \cite{AnzerBauer2021,ForcherEtAl2025,VanEetveldeEtAl2024}.
+    \item \textbf{Unentschieden bleiben problematisch:} Alle Studien berichten systematisch niedrigerer Recall-Werte für die Draw-Klasse -- eine Folge der Klassen-Imbalance ($\sim$25\% Unentschieden) \cite{HeGarcia2009,BunkerThabtah2019}.
+    \item \textbf{Domänenwissen ist essenziell:} Die besten Modelle integrieren sportsspezifisches Wissen (pi-Ratings, Teamform, Gegnerstärke) statt nur rohe Statistiken \cite{YeungEtAl2024,Constantinou2018}.
+\end{enumerate}
+
+\textbf{Forschungslücken}, die diese Arbeit adressiert:
+\begin{enumerate}
+    \item \textbf{Bundesliga-Spezifität:} Die meisten Studien verwenden EPL-Daten oder multiliga-Datensätze. Die Bundesliga weist jedoch ligaspezifische Charakteristika auf (höhere Torrate, andere Spielstile) \cite{Wheatcroft2022}.
+    \item \textbf{xG-Features:} Viele Studien nutzen keine xG-Metriken, obwohl deren prädiktiver Wert belegt ist \cite{AnzerBauer2021,VanEetveldeEtAl2024}.
+    \item \textbf{Dimensionsreduktion im Fußballkontext:} Während PCA und Feature Selection etabliert sind \cite{JamesEtAl2021}, gibt es wenige vergleichende Studien zur Wirkung auf Fußballvorhersagemodelle.
+    \item \textbf{Interpretierbarkeit:} Deep-Learning-Modelle dominieren accuracy-seitig, liefern aber wenig interpretierbare Insights -- Ensemble-Methoden mit Feature-Importance bieten hier einen Kompromiss \cite{Breiman2001,LundbergLee2017}.
+\end{enumerate}
+
+Die vorliegende Arbeit setzt daher auf eine \textbf{kombinierte Evaluation} von fünf Modellen (Logistische Regression, Random Forest, XGBoost, LightGBM, MLP) mit \textbf{xG-basierten Features} auf Bundesliga-Daten, ergänzt um eine systematische Analyse von \textbf{Dimensionsreduktionseffekten} (PCA vs.\ Feature Selection).
+
+\citet{GrollLeyEffenberger2019} betonten, dass die \textbf{Kombination aus statistischer Rigorosität und sportlichem Kontextwissen} den Unterschied zwischen akademischer Übung und praxisrelevanter Forschung ausmacht. Diese Arbeit folgt diesem Anspruch: Die Methodik (Kapitel~\ref{chap:methodik}) baut auf den hier reviewten Erkenntnissen auf und adressiert die identifizierten Forschungslücken durch eine umfassende Evaluation von xG-basierten Features im Bundesliga-Kontext.
+
+Das folgende Kapitel \ref{chap:methodik} beschreibt die Methodik, die auf diesen Erkenntnissen aufbaut.
