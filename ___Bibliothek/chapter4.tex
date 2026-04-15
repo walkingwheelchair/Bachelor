@@ -1,1 +1,177 @@
+% =============================================================================
+% KAPITEL 4: METHODIK
+% =============================================================================
+% Dieses Kapitel beschreibt das experimentelle Design der Arbeit: wie das
+% Experiment durchgeführt wird und anhand welcher Kriterien Erfolg bzw.
+% Misserfolg des Ansatzes bewertet wird. Die konkrete Implementierung --
+% Datengrundlage, Feature Engineering und Umsetzung -- folgt in Kapitel 5.
+% =============================================================================
+
 \chapter{Methodik}\label{chap:methodik}
+
+Dieses Kapitel legt das experimentelle Design der vorliegenden Arbeit dar.
+Abschnitt~\ref{sec:forschungsdesign} beschreibt den übergeordneten Ansatz
+und die Experimentstruktur. Abschnitt~\ref{sec:split} erläutert die
+Datenaufteilung und das Vorgehen zur Vermeidung von Data Leakage.
+Abschnitt~\ref{sec:metriken} definiert die Evaluationsmetriken, anhand
+derer Erfolg und Misserfolg des Ansatzes beurteilt werden.
+Abschnitt~\ref{sec:methodik-zusammenfassung} fasst die methodischen
+Entscheidungen zusammen.
+
+% -----------------------------------------------------------------------------
+\section{Forschungsdesign und Experimentstruktur}
+\label{sec:forschungsdesign}
+% -----------------------------------------------------------------------------
+
+Das zentrale Forschungsziel ist ein \textbf{kontrollierter Vergleich} zwischen
+zwei Feature-Sets: einem Basis-Set ohne Expected-Goals-Daten und einem
+erweiterten Set mit xG-Metriken. Alle anderen Bedingungen -- Algorithmen,
+Hyperparameter-Suchraum, Datensplit und Evaluationsmetriken -- bleiben
+identisch, sodass beobachtete Leistungsunterschiede kausal auf die
+Integration der xG-Features zurückgeführt werden können.
+
+\subsection{Zwei-Gruppen-Design}
+
+Jeder Modelllauf wird zweimal durchgeführt: einmal mit dem Basis-Feature-Set
+(25 Features, ohne xG) und einmal mit dem erweiterten Feature-Set (34
+Features, inklusive xG). Der direkte Paarvergleich dieser Gruppen bildet
+die empirische Grundlage für die Beantwortung der Forschungsfrage
+\cite{JamesEtAl2021}.
+
+\subsection{Datensatzvarianten}
+
+Um die Robustheit der Ergebnisse zu gewährleisten, werden für jede der
+beiden Feature-Gruppen weitere Vorverarbeitungsvarianten gebildet, die
+in Kapitel~\ref{chap:modellierung} im Detail beschrieben werden.
+Dadurch entstehen insgesamt \textbf{zwölf Datensatzvarianten}, die sich
+entlang dreier Achsen unterscheiden: xG-Integration (mit/ohne),
+Ausreißerbehandlung (unbereinigt/IQR-Bereinigung) und Dimensionsreduktion
+(alle Features/Feature-Selektion/PCA). Diese Struktur erlaubt es, den
+Effekt jeder Vorverarbeitungsentscheidung isoliert zu untersuchen
+\cite{BunkerThabtah2019}.
+
+\subsection{Algorithmenauswahl}
+
+Auf jeder der zwölf Varianten werden fünf Klassifikationsalgorithmen
+trainiert: Logistische Regression (Baseline), Random Forest, LightGBM,
+XGBoost und ein Multilayer Perceptron. Die Auswahl deckt ein breites
+Spektrum von linearen Modellen über Ensemble-Methoden bis zu neuronalen
+Netzen ab und ermöglicht eine algorithmisch robuste Einschätzung des
+xG-Effekts \cite{BunkerThabtah2019,GrollLeyEffenberger2019}. Für jeden
+Algorithmus wird ein Hyperparameter-Tuning via \texttt{RandomizedSearchCV}
+mit \texttt{StratifiedKFold} (5~Folds) durchgeführt, sodass alle Modelle
+unter vergleichbaren, optimierten Bedingungen evaluiert werden
+\cite{JamesEtAl2021}.
+
+% -----------------------------------------------------------------------------
+\section{Datenaufteilung und Leakage-Prävention}
+\label{sec:split}
+% -----------------------------------------------------------------------------
+
+Der Datensatz wird im Verhältnis \textbf{80:20} in einen Trainings- und
+einen Testdatensatz aufgeteilt. Durch Stratifizierung bleibt die
+Klassenverteilung (Heimsieg, Unentschieden, Auswärtssieg) in beiden
+Teilmengen repräsentativ erhalten \cite{JamesEtAl2021}. Das Testset wird
+ausschließlich für die abschließende Evaluation verwendet und fließt zu
+keinem Zeitpunkt in das Training oder das Hyperparameter-Tuning ein.
+
+Data Leakage -- das unbeabsichtigte Einfließen von Zukunftsinformationen
+in das Modell -- ist bei Sportvorhersagen ein bekanntes methodisches
+Problem \cite{KaufmanRossetPerlich2012}. Diese Arbeit adressiert es auf
+zwei Ebenen: Erstens werden bei der Berechnung der Form-Features eines
+Spiels ausschließlich \emph{vorangegangene} Spiele berücksichtigt.
+Zweitens werden xG-Saisondaten nach einer Lag-1-Strategie integriert:
+Für abgeschlossene Saisons dienen die xG-Werte der Vorsaison als Prior,
+da Saisonendstatistiken erst nach dem letzten Spieltag feststehen.
+Beide Maßnahmen stellen sicher, dass das Modell bei jeder Vorhersage
+ausschließlich auf Information zurückgreift, die zum Zeitpunkt des Spiels
+tatsächlich verfügbar wäre \cite{KaufmanRossetPerlich2012}.
+
+% -----------------------------------------------------------------------------
+\section{Evaluationsmetriken}
+\label{sec:metriken}
+% -----------------------------------------------------------------------------
+
+Die Wahl der Evaluationsmetriken orientiert sich an der spezifischen
+Herausforderung der Fußballvorhersage: drei unausgewogene Klassen, bei
+denen Unentschieden systematisch schwerer vorherzusagen sind
+\cite{HeGarcia2009}.
+
+\subsection{Primärmetrik: F1 macro}
+
+Die \textbf{Hauptmetrik} ist der \textbf{F1 macro}, das arithmetische
+Mittel der klassenspezifischen F1-Scores \cite{Powers2020}:
+\begin{equation}
+    F1_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K}
+    \frac{2 \cdot \text{Precision}_k \cdot \text{Recall}_k}
+         {\text{Precision}_k + \text{Recall}_k}
+\end{equation}
+mit $K = 3$ Klassen. Anders als die Accuracy, die durch die häufige
+Klasse (Heimsieg, \textasciitilde 45\,\%) dominiert wird, behandelt
+F1 macro alle Klassen gleich und ist damit robust gegenüber der
+Klassen-Imbalance \cite{Powers2020,HeGarcia2009}. Ein Modell, das
+Unentschieden vollständig ignoriert, wird durch diese Metrik deutlich
+schlechter bewertet als durch die reine Accuracy.
+
+\subsection{Sekundärmetriken}
+
+Ergänzend werden folgende Metriken erhoben:
+
+\begin{itemize}
+    \item \textbf{F1 Draw:} Der klassenspezifische F1-Score der
+          Klasse \texttt{D}, separat ausgewiesen als zentraler
+          Indikator für die Qualität der Unentschieden-Vorhersage.
+    \item \textbf{Accuracy:} Anteil korrekt klassifizierter Spiele,
+          als verbreitete Baseline-Metrik für den Literaturvergleich
+          \cite{BunkerThabtah2019,HubacekSourekZelezny2019}.
+    \item \textbf{Precision macro} und \textbf{Recall macro:}
+          Differenzieren, ob Fehler eher in falsch positiven oder
+          falsch negativen Vorhersagen liegen.
+    \item \textbf{Konfusionsmatrix:} Visualisiert die Verteilung
+          richtiger und falscher Vorhersagen je Klasse und macht
+          systematische Schwächen sichtbar.
+\end{itemize}
+
+\subsection{Erfolgskriterium}
+
+Ein Ansatz gilt als \textbf{erfolgreich} im Sinne der Forschungsfrage,
+wenn das xG-erweiterte Feature-Set gegenüber dem Basis-Set einen
+konsistenten Vorteil im F1 macro über mehrere Algorithmen und Varianten
+hinweg zeigt. Ein isolierter Ausreißer in einer einzigen Konfiguration
+wird nicht als belastbarer Beleg gewertet. Als \textbf{Misserfolg} gilt,
+wenn xG-Features keinen oder einen negativen Effekt haben -- was
+ebenfalls ein wissenschaftlich wertvolles Ergebnis darstellt, da es
+die Grenzen der Metrik im Vorhersagekontext aufzeigen würde
+\cite{AnzerBauer2021,VanEetveldeEtAl2024}.
+
+% -----------------------------------------------------------------------------
+\section{Zusammenfassung}
+\label{sec:methodik-zusammenfassung}
+% -----------------------------------------------------------------------------
+
+Tabelle~\ref{tab:methodik-entscheidungen} fasst die zentralen
+methodischen Entscheidungen zusammen.
+
+\begin{table}[h]
+    \centering
+    \caption{Zentrale methodische Entscheidungen im Überblick}
+    \label{tab:methodik-entscheidungen}
+    \begin{tabular}{p{3.5cm} p{3.8cm} p{4.7cm}}
+        \toprule
+        \textbf{Entscheidung} & \textbf{Umsetzung} & \textbf{Begründung} \\
+        \midrule
+        Vergleichsdesign   & Paarvergleich mit/ohne xG           & Kausale Isolierung des xG-Effekts \\
+        Datensatzvarianten & 12 Kombinationen                    & Robustheit über Vorverarbeitungsschritte \\
+        Algorithmen        & 5 (LR, RF, LGBM, XGBoost, MLP)     & Breites Spektrum; faire Bewertung \\
+        Tuning             & RandomizedSearchCV, StratifiedKFold & Vergleichbare Bedingungen für alle Modelle \\
+        Datensplit         & 80:20, stratifiziert                & Repräsentative Klassenverteilung im Testset \\
+        Leakage-Prävention & Shift(1) + Lag-1 für xG             & Temporal valide Vorhersagen \\
+        Hauptmetrik        & F1 macro                            & Robust bei Klassen-Imbalance \cite{Powers2020} \\
+        Sekundärmetrik     & F1 Draw (separat)                   & Fokus auf schwierigste Klasse \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Das folgende Kapitel~\ref{chap:modellierung} beschreibt die konkrete
+Implementierung: Datengrundlage, Feature Engineering und Umsetzung
+der ML-Pipeline.
