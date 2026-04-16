@@ -1,57 +1,167 @@
 % =============================================================================
 % KAPITEL 2: THEORETISCHE GRUNDLAGEN
 % =============================================================================
-% Dieses Kapitel führt die theoretischen Grundlagen ein, die für das Verständnis
-% der in dieser Arbeit entwickelten Methodik erforderlich sind. Im Zentrum stehen
-% Machine-Learning-Algorithmen, die Vorhersagbarkeit von Fußballergebnissen als
-% multivariates Problem, Verfahren zur Dimensionsreduktion und das Konzept der
-% Expected Goals (xG).
+
+\chapter{Theoretische Grundlagen}\label{chap:grundlagen}
+
+Dieses Kapitel legt die theoretischen Fundamente für die Vorhersage von
+Bundesliga-Spielergebnissen mittels Machine Learning. Abschnitt~\ref{sec:ml-grundlagen}
+führt in Machine Learning als überwachtes Klassifikationsproblem ein und
+beleuchtet die Besonderheiten des Sportkontexts. Abschnitt~\ref{sec:modelle}
+stellt die fünf eingesetzten Algorithmen vor. Abschnitt~\ref{sec:vorhersagbarkeit}
+diskutiert die grundlegenden Grenzen der Vorhersagbarkeit multivariater
+Ereignisse sowie die theoretischen Konzepte für den Umgang mit ihnen.
+Abschnitt~\ref{sec:dimensionsreduktion} behandelt Verfahren der
+Dimensionsreduktion und Feature-Selektion. Abschnitt~\ref{sec:expected-goals}
+schließt mit dem Konzept der Expected Goals ab.
+
+% =============================================================================
+\section{Machine Learning als überwachtes Klassifikationsproblem}
+\label{sec:ml-grundlagen}
 % =============================================================================
 
-\chapter{Theoretische Grundlagen}
+\textbf{Machine Learning} (ML) bezeichnet einen Teilbereich der Künstlichen
+Intelligenz, bei dem Systeme aus Daten lernen, ohne für jede Entscheidung
+explizit programmiert zu werden \cite{JamesEtAl2021}. Die Literatur
+unterscheidet drei Lernparadigmen: überwachtes, unüberwachtes und
+bestärkendes Lernen \cite{JamesEtAl2021,BunkerThabtah2019}. Die vorliegende
+Arbeit befasst sich ausschließlich mit \textbf{überwachtem Lernen}: Der
+Algorithmus erhält eine Menge von Trainingsbeispielen $\{(\mathbf{x}_i,
+y_i)\}_{i=1}^{n}$ und lernt eine Funktion $f: \mathbf{x} \mapsto y$,
+die für neue, ungesehene Eingaben $\mathbf{x}$ möglichst korrekte
+Ausgaben $\hat{y}$ produziert.
 
-Dieses Kapitel legt die theoretischen Fundamente für die Methodik zur Vorhersage von Bundesliga-Spielergebnissen. Abschnitt 2.1 führt in Machine Learning ein, Abschnitt 2.2 betrachtet den Sportkontext. Abschnitt 2.3 erläutert die eingesetzten Algorithmen, Abschnitt 2.4 diskutiert die Grenzen der Vorhersagbarkeit. Verfahren zur Dimensionsreduktion (2.5) und Expected Goals (2.6) runden das Kapitel ab.
+\subsection{Multiclass-Klassifikation}
 
-\section{Machine Learning -- Grundlagen und Überblick}
-\label{sec:ml-grundlagen}
+Innerhalb des überwachten Lernens ist die Spielvorhersage ein
+\textbf{Multiclass-Klassifikationsproblem}: Die Zielvariable $y$ nimmt
+eine von $K = 3$ diskreten Klassen an -- Heimsieg (\texttt{H}),
+Unentschieden (\texttt{D}) oder Auswärtssieg (\texttt{A}). Im Gegensatz
+zur binären Klassifikation muss ein Multiclass-Klassifikator gleichzeitig
+zwischen mehreren Klassen unterscheiden. Dies erfordert entweder eine
+inhärente Multiclass-Unterstützung des Algorithmus (wie bei der Softmax-
+Logistischen Regression) oder eine Zerlegungsstrategie wie
+\textit{One-vs-Rest} \cite{JamesEtAl2021,HastieEtAl2009}.
 
-\textbf{Machine Learning} (ML) bezeichnet einen Teilbereich der Künstlichen Intelligenz, der es Systemen ermöglicht, aus Daten zu lernen und Vorhersagen zu generieren, ohne explizit programmiert zu werden \cite{JamesEtAl2021}. Im Kontext dieser Arbeit ist der \textbf{Task} die Vorhersage des Spielergebnisses (Heimsieg, Unentschieden, Auswärtssieg), die \textbf{Experience} umfasst historische Spieldaten und xG-Werte, das \textbf{Performance Measure} ist der F1-Score (macro).
+Ein besonderes Problem im Fußballkontext ist die \textbf{Klassen-Imbalance}:
+Heimsiege machen in der Bundesliga etwa 45\,\% aller Ergebnisse aus,
+Auswärtssiege ca.\ 30\,\% und Unentschieden nur rund 25\,\% \cite{HeGarcia2009}.
+Unausgewogene Klassenverteilungen veranlassen viele Algorithmen dazu, die
+Mehrheitsklasse zu bevorzugen und die Minderheitsklasse systematisch zu
+ignorieren \cite{JapkowiczStephen2002}. Dieser Effekt lässt sich durch
+drei Strategien abmildern:
 
-Die Literatur unterscheidet überwachtes, unüberwachtes und bestärkendes Lernen \cite{JamesEtAl2021,BunkerThabtah2019}. Die Spielvorhersage ist ein \textbf{überwachtes Klassifikationsproblem}: Der Algorithmus lernt aus gelabelten Trainingsdaten eine Funktion $f: \mathbf{x} \mapsto y$ zu approximieren.
+\begin{itemize}
+    \item \textbf{Class Weights:} Den Klassen werden beim Training umgekehrt
+          proportionale Gewichte zugewiesen. Ein seltenes Unentschieden wird
+          damit stärker bestraft, wenn es falsch klassifiziert wird
+          \cite{JamesEtAl2021}.
+    \item \textbf{Sample Weights:} Statt klassenspezifischer Gewichte wird
+          jedem Trainingsbeispiel individuell ein Gewicht zugewiesen, das
+          invers zur Häufigkeit seiner Klasse ist \cite{ScikitLearn2024}.
+          Dies ist insbesondere bei Algorithmen nötig, die keine direkte
+          \texttt{class\_weight}-Option unterstützen.
+    \item \textbf{Oversampling:} Die Minderheitsklassen werden durch
+          Wiederholung oder synthetische Generierung (z.\,B.\ SMOTE) auf
+          die Größe der Mehrheitsklasse aufgefüllt \cite{ChawlaEtAl2002}.
+          Dabei darf das Oversampling ausschließlich auf dem Trainingsdatensatz
+          stattfinden, um eine Kontamination des Testsets zu vermeiden.
+\end{itemize}
 
-Ein zentrales Konzept ist das \textbf{Bias-Varianz-Dilemma} \cite{GemanEtAl1992}:
+\subsection{Bias-Varianz-Dilemma, Overfitting und Underfitting}
+
+Ein zentrales theoretisches Konzept des maschinellen Lernens ist das
+\textbf{Bias-Varianz-Dilemma} \cite{GemanEtAl1992}. Der erwartete
+quadratische Fehler eines Modells lässt sich zerlegen in:
 \begin{equation}
-    \text{Error} = \text{Bias}^2 + \text{Variance} + \text{Irreducible Error}
+    \mathbb{E}[(y - \hat{f}(\mathbf{x}))^2]
+    = \underbrace{\text{Bias}^2[\hat{f}]}_{\text{Underfitting}}
+    + \underbrace{\text{Var}[\hat{f}]}_{\text{Overfitting}}
+    + \underbrace{\sigma^2}_{\text{irreduzibel}}
 \end{equation}
-Bias beschreibt systematische Fehler durch Vereinfachung (Underfitting), Variance Überempfindlichkeit gegenüber Trainingsdaten (Overfitting). Techniken wie \textbf{Cross-Validation}, \textbf{Regularisierung} und \textbf{Early Stopping} kontrollieren diesen Kompromiss \cite{JamesEtAl2021}.
+\textbf{Bias} beschreibt systematische Fehler, die entstehen, wenn das
+Modell zu simpel ist, um die wahren Zusammenhänge in den Daten zu
+erfassen (\textit{Underfitting}). \textbf{Varianz} beschreibt die
+Überempfindlichkeit eines Modells gegenüber den spezifischen
+Trainingsdaten: Das Modell lernt deren Rauschen auswendig, anstatt
+verallgemeinerbare Muster zu extrahieren (\textit{Overfitting}). Der
+Term $\sigma^2$ ist der \textbf{irreduzible Fehler} -- derjenige Anteil
+der Zielvariablen-Varianz, der auf nicht beobachtbare Einflüsse zurückgeht
+und durch kein Modell eliminiert werden kann \cite{JamesEtAl2021}.
 
-\section{Machine Learning im Sportkontext}
-\label{sec:ml-sport}
+Overfitting ist besonders bei kleinen Datensätzen gefährlich. Mit nur
+rund 306 Spielen pro Bundesliga-Saison und insgesamt etwa 2\,900
+Beobachtungen ist die Gefahr, dass komplexe Modelle die Trainingsdaten
+auswendig lernen, anstatt echte Muster zu erkennen, nicht trivial
+\cite{Sumpter2016}. Techniken zur Kontrolle des Overfittings umfassen
+\textbf{Regularisierung} (L1/L2-Strafterme), \textbf{Early Stopping}
+(Abbruch des Trainings, sobald die Validierungsperformance nicht mehr
+steigt) \cite{GoodfellowEtAl2016} sowie \textbf{Cross-Validation} zur
+robusten Schätzung der Generalisierungsleistung.
 
-Die Anwendung quantitativer Methoden im Sport hat eine lange Historie \cite{Rickey1947,Lewis2003}. Im Fußball setzten sich ab den 2010er-Jahren Metriken wie xG, xA und Possession-Value-Modelle durch \cite{AnzerBauer2021,Wheatcroft2022}. Tabelle \ref{tab:ml-anwendungen} zeigt typische Anwendungsbereiche.
+\subsection{Modellselektion und Hyperparameteroptimierung}
 
-\begin{table}[h]
-    \centering
-    \caption{Anwendungsbereiche von Machine Learning im Fußball}
-    \label{tab:ml-anwendungen}
-    \begin{tabular}{p{3.5cm} p{6cm} p{4cm}}
-        \toprule
-        \textbf{Bereich} & \textbf{Beschreibung} & \textbf{Typische Algorithmen} \\
-        \midrule
-        Spielvorhersage & Prognose von Spielergebnissen & Logistische Regression, Random Forest, XGBoost \\
-        Spielerbewertung & Quantifizierung individueller Leistung & Regression, Clustering, Ranking \\
-        Taktikanalyse & Erkennung von Spielmustern & Clustering, Deep Learning \\
-        Verletzungsprävention & Vorhersage von Verletzungsrisiken & Klassifikation, Survival Analysis \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+Alle ML-Algorithmen besitzen \textbf{Hyperparameter} -- Steuergrößen,
+die nicht aus den Daten gelernt, sondern vor dem Training vom Anwender
+gesetzt werden (z.\,B.\ Baumtiefe, Lernrate, Regularisierungsstärke).
+Die Suche nach guten Hyperparameter-Kombinationen wird als
+\textbf{Hyperparameteroptimierung} bezeichnet \cite{JamesEtAl2021}.
+Da eine vollständige Rastersuche (\textit{Grid Search}) bei großen
+Suchräumen exponentiell teuer wird, bietet die \textbf{Randomized Search}
+eine effiziente Alternative: Sie sampelt zufällig eine festgelegte Anzahl
+von Kombinationen aus dem Suchraum und identifiziert so häufig annähernd
+optimale Konfigurationen bei deutlich geringerem Rechenaufwand
+\cite{JamesEtAl2021}.
 
-Sportdaten weisen charakteristische Eigenschaften auf \cite{BunkerThabtah2019,Sumpter2016}: \textbf{Hohe Varianz}, \textbf{Klassen-Imbalance} (Unentschieden $\sim$25\% \cite{HeGarcia2009}), \textbf{temporale Abhängigkeiten} und \textbf{Multikollinearität} zwischen korrelierten Statistiken \cite{JamesEtAl2021}.
+Um zu verhindern, dass die Hyperparameter auf dem Testset überoptimiert
+werden (\textit{Overfitting auf Hyperparameter-Ebene}), erfolgt die
+Selektion stets über \textbf{Kreuzvalidierung}. Bei der
+\textbf{Stratified K-Fold Cross-Validation} wird der Trainingsdatensatz
+in $K$ gleichgroße Faltungen aufgeteilt, wobei die Klassenverteilung
+in jeder Faltung der des Gesamtdatensatzes entspricht (\textit{Stratifizierung}).
+Für jede der $K$ Runden dient eine andere Faltung als Validierungsmenge,
+die restlichen $K-1$ als Training. Das Ergebnis ist eine stabile
+Performance-Schätzung, die robust gegenüber Zufallsschwankungen in
+einzelnen Datensplits ist \cite{JamesEtAl2021}.
 
+\subsection{Besonderheiten von Sportdaten im ML-Kontext}
+
+Sportdaten im Allgemeinen und Fußballdaten im Besonderen weisen
+charakteristische Eigenschaften auf, die bei der Modellierung berücksichtigt
+werden müssen \cite{BunkerThabtah2019,Sumpter2016}:
+
+\begin{itemize}
+    \item \textbf{Temporale Abhängigkeiten:} Die Leistung eines Teams in
+          Spielwoche $t$ ist nicht unabhängig von der Leistung in Woche
+          $t-1$. Features müssen diese zeitliche Struktur abbilden, ohne
+          dabei zukünftige Information einzubeziehen (\textit{Data Leakage}).
+    \item \textbf{Klassen-Imbalance:} Wie oben beschrieben sind die drei
+          Ergebnisklassen ungleich häufig vertreten \cite{HeGarcia2009}.
+    \item \textbf{Hohe Varianz und Rauschen:} Fußball ist ein
+          Low-Scoring-Sport mit starkem Zufallseinfluss. Ein zufälliger
+          Abpraller kann ein Spiel entscheiden, das eine Mannschaft
+          dominiert hat \cite{DobsonGoddard2011}.
+    \item \textbf{Multikollinearität:} Viele Spielstatistiken (z.\,B.
+          Schüsse und Schüsse aufs Tor, xG und Tore) korrelieren stark
+          miteinander, was Schätzungen in linearen Modellen destabilisiert
+          \cite{JamesEtAl2021}.
+    \item \textbf{Datenqualität und -integration:} Spielstatistiken
+          stammen oft aus unterschiedlichen Quellen mit inkonsistenten
+          Teamnamen, fehlenden Werten oder unterschiedlichen
+          Erfassungsstandards. Eine sorgfältige Normalisierung,
+          Qualitätsprüfung und Zusammenführung der Quellen ist
+          Grundvoraussetzung für valide Modelle \cite{BunkerThabtah2019}.
+\end{itemize}
+
+% =============================================================================
 \section{Eingesetzte Machine-Learning-Modelle}
 \label{sec:modelle}
+% =============================================================================
 
-Diese Arbeit evaluiert fünf Algorithmen \cite{JamesEtAl2021}: Logistische Regression (Baseline), Random Forest und Gradient-Boosting-Methoden (Ensemble), sowie ein Multilayer Perceptron (Deep Learning). Tabelle~\ref{tab:model-uebersicht} bietet einen Überblick.
+Tabelle~\ref{tab:model-uebersicht} gibt einen Überblick über die fünf
+in dieser Arbeit evaluierten Algorithmen. Die Auswahl deckt ein breites
+Spektrum von interpretablen linearen Modellen über Ensemble-Methoden bis
+hin zu neuronalen Netzen ab.
 
 \begin{table}[h]
     \centering
@@ -61,11 +171,11 @@ Diese Arbeit evaluiert fünf Algorithmen \cite{JamesEtAl2021}: Logistische Regre
         \toprule
         \textbf{Modell} & \textbf{Typ} & \textbf{Komplexität} & \textbf{Interpretierbarkeit} \\
         \midrule
-        Logistische Regression & Linear & Niedrig & Hoch \\
-        Random Forest & Ensemble (Bagging) & Mittel & Mittel \\
-        LightGBM & Ensemble (Boosting) & Hoch & Mittel \\
-        XGBoost & Ensemble (Boosting) & Hoch & Mittel \\
-        Multilayer Perceptron & Neuronales Netz & Sehr hoch & Niedrig \\
+        Logistische Regression & Linear          & Niedrig   & Hoch \\
+        Random Forest          & Bagging-Ensemble & Mittel    & Mittel \\
+        LightGBM               & Boosting-Ensemble & Hoch     & Mittel \\
+        XGBoost                & Boosting-Ensemble & Hoch     & Mittel \\
+        Multilayer Perceptron  & Neuronales Netz  & Sehr hoch & Niedrig \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -73,102 +183,524 @@ Diese Arbeit evaluiert fünf Algorithmen \cite{JamesEtAl2021}: Logistische Regre
 \subsection{Logistische Regression}
 \label{sec:logreg}
 
-Die \textbf{Logistische Regression} modelliert die Klassenwahrscheinlichkeiten als Softmax-Transformation einer linearen Funktion der Features \cite{JamesEtAl2021,HastieEtAl2009}. Für drei Klassen (Heimsieg, Unentschieden, Auswärtssieg) gilt:
+Die \textbf{Logistische Regression} ist das klassische lineare Modell
+für Klassifikationsaufgaben und dient in dieser Arbeit als
+\textbf{Baseline} \cite{JamesEtAl2021,HastieEtAl2009}. Für $K = 3$
+Klassen modelliert sie die Klassenwahrscheinlichkeiten über die
+Softmax-Funktion:
 \begin{equation}
-    P(y=k|\mathbf{x}) = \frac{e^{\beta_{k0} + \sum_{j=1}^{p} \beta_{kj} x_j}}{\sum_{l=1}^{3} e^{\beta_{l0} + \sum_{j=1}^{p} \beta_{lj} x_j}}
+    P(y=k \mid \mathbf{x}) = \frac{
+        \exp\!\left(\beta_{k0} + \sum_{j=1}^{p} \beta_{kj} x_j\right)
+    }{
+        \sum_{l=1}^{K} \exp\!\left(\beta_{l0} + \sum_{j=1}^{p} \beta_{lj} x_j\right)
+    }
 \end{equation}
-L2-Regularisierung mit Hyperparameter $C$ kontrolliert Overfitting. Die Logistische Regression dient als \textbf{Baseline-Modell} \cite{BunkerThabtah2019} und bietet hohe Interpretierbarkeit bei geringer Rechenzeit.
+Die Koeffizienten $\beta_{kj}$ werden durch Maximierung der
+Log-Likelihood geschätzt. \textbf{L2-Regularisierung} (Ridge) mit dem
+inversen Strafterm $C$ kontrolliert Overfitting und verhindert zu große
+Koeffizientenwerte \cite{HastieEtAl2009}. Die logistische Regression
+bietet hohe Interpretierbarkeit -- die Koeffizientenvorzeichen geben
+direkt an, welche Features einen Heimsieg begünstigen oder hemmen --
+bei gleichzeitig geringem Rechenaufwand \cite{BunkerThabtah2019}.
+Nachteilig ist ihre Unfähigkeit, nicht-lineare Zusammenhänge und
+Feature-Interaktionen ohne manuelle Erweiterungen zu erfassen.
 
 \subsection{Random Forest}
 \label{sec:random-forest}
 
-Der \textbf{Random Forest} kombiniert multiple Entscheidungsbäume via Bootstrap Aggregating (Bagging) \cite{Breiman2001}. Bei jedem Knoten-Split wird nur eine zufällige Teilmenge von $m = \sqrt{p}$ Features betrachtet, was die Bäume dekorreliert und Varianzreduktion maximiert. Random Forests gelten als robuste \glqq Workhorse\grqq{}-Algorithmen für tabellarische Daten und liefern zudem Feature-Importance-Schätzungen \cite{BunkerThabtah2019,JamesEtAl2021}.
+Der \textbf{Random Forest} ist ein Ensemble-Verfahren, das nach dem
+Prinzip des \textbf{Bootstrap Aggregating (Bagging)} eine Vielzahl von
+Entscheidungsbäumen kombiniert \cite{Breiman2001}. Jeder Baum wird auf
+einer Zufallsstichprobe der Trainingsdaten (mit Zurücklegen) trainiert.
+Zusätzlich wird bei jedem Knoten-Split nur eine zufällige Teilmenge
+von $m \approx \sqrt{p}$ Features als Kandidaten zugelassen. Diese
+doppelte Randomisierung dekorreliert die Bäume, was die Varianz des
+Ensembles gegenüber einzelnen Bäumen erheblich reduziert, ohne den Bias
+wesentlich zu erhöhen \cite{JamesEtAl2021}.
+
+Ein wichtiger Nebeneffekt ist die \textbf{Feature Importance}: Für
+jeden Baum und jeden Split kann gemessen werden, wie stark die jeweilige
+Feature-Variable die Reinheit der entstehenden Knoten verbessert
+(\textit{Gini Importance}). Über alle Bäume gemittelt ergibt dies eine
+stabile Aussage darüber, welche Features für die Vorhersage am
+einflussreichsten sind \cite{Breiman2001,LundbergLee2017}.
 
 \subsection{Gradient Boosting: XGBoost und LightGBM}
 \label{sec:gradient-boosting}
 
-\textbf{Gradient Boosting} trainiert Bäume sequenziell, um die Residuen ihrer Vorgänger zu korrigieren \cite{Friedman2001}: $F_M(\mathbf{x}) = \sum_{m=1}^{M} \eta \cdot f_m(\mathbf{x})$. \textbf{XGBoost} \cite{ChenGuestrin2016} ergänzt dies um eine regularisierte Loss-Funktion und System-Optimierungen; \textbf{LightGBM} \cite{KeEtAl2017} nutzt leaf-wise Baumwachstum, Gradient-based One-Side Sampling (GOSS) und Exclusive Feature Bundling (EFB) für deutlich höhere Effizienz. Beide Algorithmen gehören zu den leistungsfähigsten Methoden für tabellarische Daten \cite{GrollLeyEffenberger2019,HubacekSourekZelezny2019}.
+\textbf{Gradient Boosting} \cite{Friedman2001} ist ein sequenzielles
+Ensemble-Verfahren: Jeder neue Baum $f_m$ wird darauf trainiert, die
+Residuen (genauer: den negativen Gradienten der Verlustfunktion) seines
+Vorgänger-Ensembles zu korrigieren. Das finale Ensemble lautet:
+\begin{equation}
+    F_M(\mathbf{x}) = \sum_{m=1}^{M} \eta \cdot f_m(\mathbf{x})
+\end{equation}
+wobei $\eta$ die \textit{Lernrate} ist, die bestimmt, wie stark jeder
+neue Baum in das Ensemble einfließt. Eine kleine Lernrate erfordert
+mehr Bäume ($M$ groß), erzeugt aber in der Regel robustere Modelle
+\cite{JamesEtAl2021}.
 
-\subsection{Multilayer Perceptron (Neuronales Netz)}
+\textbf{XGBoost} \cite{ChenGuestrin2016} erweitert das Gradient-Boosting-
+Rahmenwerk um eine regularisierte Verlustfunktion, die sowohl L1- als
+auch L2-Strafterme enthält, sowie um System-Optimierungen für
+paralleles Training. Zusätzliche Hyperparameter wie \texttt{gamma}
+(Mindestschwelle für einen Knoten-Split) und \texttt{min\_child\_weight}
+(Mindestanzahl von Trainingsbeispielen pro Blatt) ermöglichen eine
+feingranulare Kontrolle des Overfitting-Risikos.
+
+\textbf{LightGBM} \cite{KeEtAl2017} verfolgt einen alternativen
+Ansatz: Statt des üblichen \textit{level-wise} Baumwachstums (alle
+Knoten einer Tiefe werden gleichzeitig gespalten) setzt LightGBM auf
+\textit{leaf-wise} Wachstum -- der Knoten mit dem größten Gewinn wird
+zuerst gespalten, unabhängig von seiner Tiefe. Hinzu kommen
+\textit{Gradient-based One-Side Sampling} (GOSS), das Trainingsdaten
+mit kleinem Gradienten -- also bereits gut gelernte Beispiele --
+reduziert, und \textit{Exclusive Feature Bundling} (EFB), das
+gegenseitig ausschließende Features zusammenfasst. Das Ergebnis ist
+ein erheblich schnellerer und speichereffizienterer Algorithmus bei
+vergleichbarer Qualität \cite{KeEtAl2017}.
+
+Beide Gradient-Boosting-Implementierungen liefern ebenfalls
+\textbf{Feature-Importance-Werte} und gehören zum State of the Art
+für tabellarische Daten \cite{GrollLeyEffenberger2019,HubacekSourekZelezny2019}.
+
+\subsection{Multilayer Perceptron}
 \label{sec:mlp}
 
-Das \textbf{Multilayer Perceptron} (MLP) ist ein feedforward neuronales Netz, das affine Transformationen mit nicht-linearen Aktivierungsfunktionen (ReLU in Hidden Layers, Softmax in der Output-Schicht) verkettet \cite{GoodfellowEtAl2016}. Training erfolgt via Backpropagation und Cross-Entropy Loss \cite{RumelhartEtAl1986}. Regularisierung umfasst L2-Gewichtszerfall, Dropout \cite{SrivastavaEtAl2014} und Early Stopping. In dieser Arbeit wird ein MLP mit zwei Hidden Layers als repräsentativer Deep-Learning-Ansatz evaluiert \cite{Shwartz-ZivAramon2020}.
+Das \textbf{Multilayer Perceptron} (MLP) ist ein feedforward neuronales
+Netz, das aus einer Eingabeschicht, einer oder mehreren versteckten
+Schichten (\textit{Hidden Layers}) und einer Ausgabeschicht besteht
+\cite{GoodfellowEtAl2016}. Jede Schicht berechnet eine affine
+Transformation der Eingabe, gefolgt von einer nicht-linearen
+Aktivierungsfunktion:
+\begin{equation}
+    \mathbf{h}^{(l)} = \sigma\!\left(\mathbf{W}^{(l)} \mathbf{h}^{(l-1)} + \mathbf{b}^{(l)}\right)
+\end{equation}
+In den versteckten Schichten wird typischerweise \textbf{ReLU}
+($\sigma(z) = \max(0, z)$) als Aktivierungsfunktion verwendet, da
+sie das Problem verschwindender Gradienten bei tiefen Netzen abmildert.
+Die Ausgabeschicht verwendet \textbf{Softmax}, um Klassenwahrscheinlichkeiten
+zu erzeugen. Das Training erfolgt via \textbf{Backpropagation} und
+stochastischem Gradientenabstieg, wobei die \textbf{Cross-Entropy-Loss}
+minimiert wird \cite{RumelhartEtAl1986}.
 
+Overfitting ist beim MLP besonders ausgeprägt, da die Zahl der
+Parameter die Anzahl der Trainingsbeispiele leicht übersteigen kann.
+Gegenmaßnahmen umfassen \textbf{L2-Gewichtsregularisierung},
+\textbf{Dropout} (zufälliges Deaktivieren von Neuronen während des
+Trainings \cite{SrivastavaEtAl2014}) sowie \textbf{Early Stopping}:
+Das Training wird abgebrochen, sobald der Validierungsverlust über
+mehrere Epochen hinweg nicht weiter sinkt \cite{GoodfellowEtAl2016}.
+Der bis dahin beste Modellzustand wird gespeichert. Early Stopping
+wirkt gleichzeitig als implizite Regularisierung und erspart die
+manuelle Wahl der Epochenanzahl.
+
+% =============================================================================
 \section{Vorhersagbarkeit multivariater Ereignisse}
 \label{sec:vorhersagbarkeit}
+% =============================================================================
 
-Das Spielergebnis $Y$ lässt sich als Funktion zahlreicher Prädiktoren modellieren \cite{JamesEtAl2021,HastieEtAl2009}:
+\subsection{Das multivariate Vorhersageproblem}
+
+Das Ergebnis eines Fußballspiels hängt von einer theoretisch unbegrenzten
+Anzahl von Einflussgrößen ab: Spielerform, Verletzungen, Tagesform,
+Wetter, Schiedsrichterentscheidungen, taktische Anpassungen während des
+Spiels, Platzierungsdruck, Reisemüdigkeit und viele weitere Faktoren
+\cite{DobsonGoddard2011,Sumpter2016}. Formal lässt sich dies schreiben als:
 \begin{equation}
-    Y = f(X_1, X_2, \dots, X_p) + \varepsilon
+    Y = f(X_1, X_2, \dots, X_p, X_{p+1}, \dots) + \varepsilon
 \end{equation}
-Der Term $\varepsilon$ enthält den \textbf{irreduziblen Fehler} $\sigma^2$, der aus nicht beobachtbaren Variablen, inhärentem Rauschen und Modellmisspezifikation resultiert \cite{GemanEtAl1992}. \textbf{Selbst ein perfektes Modell würde niemals 100\% Accuracy erreichen} \cite{DobsonGoddard2011} -- empirische Studien zeigen, dass die besten Modelle bei etwa 55--60\% Accuracy liegen \cite{BunkerThabtah2019,HubacekSourekZelezny2019}.
+wobei $X_1, \dots, X_p$ die beobachtbaren Features sind und alle weiteren
+Einflussgrößen im Störterm $\varepsilon$ gebündelt werden. Dieser enthält
+den \textbf{irreduziblen Fehler} $\sigma^2$ -- denjenigen Varianzanteil,
+der prinzipiell nicht durch ein Modell erklärt werden kann, weil die
+zugrundeliegenden Faktoren nicht messbar oder modellierbar sind
+\cite{GemanEtAl1992}. Selbst ein theoretisch perfektes Modell mit Zugang
+zu allen beobachtbaren Prädiktoren würde diesen Fehler nicht beseitigen
+können.
 
-Fußballergebnisse sind \textbf{emergente Phänomene} \cite{Sumpter2016}: Nicht-lineare Interaktionen, Feedback-Schleifen (ein frühes Tor verändert das Spielgeschehen fundamental) und Kaskadeneffekte (rote Karte) erschweren die Modellierung. Fußball weist zudem Eigenschaften \textbf{deterministisch-chaotischer Systeme} auf \cite{Strogatz2015}: Kleinste Unterschiede in den Ausgangsbedingungen führen zu dramatisch unterschiedlichen Verläufen (\glqq Schmetterlingseffekt\grqq~\cite{Lorenz1963}).
+\subsection{Feature Engineering und zeitabhängige Formabbildung}
 
-Als \textbf{Low-Scoring-Sport} (Bundesliga: $\varnothing$ 2,86 Tore/Spiel) amplifiziert der Fußball den Zufallseinfluss erheblich \cite{DobsonGoddard2011}. \citet{Wheatcroft2022} schätzte, dass ca. 30--40\% der Ergebnisvarianz auf zufällige Faktoren zurückzuführen sind -- eine \textbf{fundamentale Obergrenze} der Vorhersagbarkeit. Pragmatische Konsequenz: Accuracy-Ziele von 50--60\% sind realistisch; probabilistische Vorhersagen und Ensemble-Methoden sind zu bevorzugen \cite{JamesEtAl2021,BunkerThabtah2019}.
+Da Rohdaten (Tabellenpositionen, Einzelspiel-Tore) kurzfristige
+Schwankungen schlecht abbilden, sind aufbereitete \textbf{Form-Features}
+zentral für die Vorhersagequalität. Zwei Konzepte sind dabei besonders
+relevant:
 
-\section{Dimensionsreduktion}
+\textbf{Rolling Windows} berechnen Durchschnitte oder Summen über ein
+gleitendes Zeitfenster der letzten $n$ Spiele \cite{BunkerThabtah2019}.
+Ein einfaches Rolling Window gewichtet alle Spiele innerhalb des Fensters
+gleich. Dieser Ansatz ist intuitiv, reagiert jedoch sprunghaft, wenn ein
+altes Spiel aus dem Fenster fällt.
+
+\textbf{Exponentially Weighted Averages (EWA)} lösen dieses Problem,
+indem neueren Spielen exponentiell höheres Gewicht zugewiesen wird
+\cite{Brown1956,HyndmanAthanasopoulos2021}. Der EWA zum Zeitpunkt $t$
+berechnet sich rekursiv als:
+\begin{equation}
+    S_t = \alpha \cdot x_t + (1 - \alpha) \cdot S_{t-1},
+    \quad \alpha = \frac{2}{s + 1}
+\end{equation}
+wobei $s$ der Span-Parameter ist und $\alpha \in (0, 1)$ der
+Glättungsfaktor. Ein großes $s$ (flache Gewichtung) ergibt einen
+stabilen, aber trägen Durchschnitt; ein kleines $s$ (steile Gewichtung)
+reagiert schnell auf aktuelle Form, ist aber anfälliger für Rauschen.
+EWA gelten in der Zeitreihenanalyse als robuster als einfache Rolling
+Windows, da sie ohne scharfe Fensterränder auskommen \cite{HyndmanAthanasopoulos2021}.
+
+\subsection{Data Leakage}
+
+\textbf{Data Leakage} bezeichnet das unbeabsichtigte Einfließen von
+Information aus der Zukunft in die Modellierung \cite{KaufmanRossetPerlich2012}.
+Im Sportkontext tritt es auf, wenn zum Beispiel der EWA-Wert eines Spiels
+das Ergebnis dieses Spiels selbst einschließt, oder wenn saisonale
+Statistiken zum Zeitpunkt eines Spiels noch nicht feststehen. Data Leakage
+führt zu künstlich hohen Trainingsperformances und zu Modellen, die in
+der Praxis deutlich schlechter abschneiden als in der Evaluation -- da
+in der Praxis die \glqq zukunftige\grqq{} Information schlicht nicht
+verfügbar ist \cite{KaufmanRossetPerlich2012}. Die konsequente Vermeidung
+von Data Leakage ist eine der wichtigsten methodischen Anforderungen an
+zeitreihenbasierte Vorhersagesysteme.
+
+\subsection{Ausreißer und IQR-Bereinigung}
+
+\textbf{Ausreißer} sind Beobachtungen, die stark vom typischen Muster
+abweichen. Sie können durch Datenfehler, außergewöhnliche Spielverläufe
+(z.\,B.\ 9:0-Ergebnis) oder seltene Ereignisse entstehen. Ausreißer
+können Modelle verzerren, insbesondere lineare Modelle und Algorithmen,
+die empfindlich auf die Skalierung der Eingaben reagieren
+\cite{JamesEtAl2021}.
+
+Eine verbreitete Methode zur Ausreißererkennung ist der
+\textbf{Interquartilsabstand (IQR)}. Für ein gegebenes Feature gilt:
+\begin{equation}
+    \text{IQR} = Q_3 - Q_1
+\end{equation}
+Beobachtungen außerhalb des Intervalls $[Q_1 - c \cdot \text{IQR},\;
+Q_3 + c \cdot \text{IQR}]$ werden als Ausreißer klassifiziert. Der
+Multiplikator $c$ bestimmt die Strenge der Bereinigung: $c = 1{,}5$
+ist der Standardwert für moderate Bereinigung, $c = 3{,}0$ für die
+Entfernung nur extremer Ausreißer \cite{JamesEtAl2021}. Der Vorteil
+des IQR gegenüber z-Score-basierten Methoden ist die Robustheit
+gegenüber schiefen Verteilungen, da er kein Gauß'sches Grundmodell
+voraussetzt.
+
+\subsection{Korrelation und Pearson-Korrelationskoeffizient}
+
+Der \textbf{Pearson-Korrelationskoeffizient} $r$ misst den linearen
+Zusammenhang zwischen zwei Variablen \cite{JamesEtAl2021}:
+\begin{equation}
+    r_{XY} = \frac{\sum_{i=1}^{n}(x_i - \bar{x})(y_i - \bar{y})}
+                  {\sqrt{\sum_{i=1}^{n}(x_i - \bar{x})^2 \cdot
+                         \sum_{i=1}^{n}(y_i - \bar{y})^2}}
+\end{equation}
+$r$ liegt stets im Intervall $[-1, 1]$: $r = 1$ entspricht perfekter
+positiver Korrelation, $r = -1$ perfekter negativer Korrelation,
+$r = 0$ linearer Unabhängigkeit. Im Feature-Engineering-Kontext
+wird der Pearson-Koeffizient genutzt, um die Stärke des Zusammenhangs
+jedes Features mit der Zielvariablen zu beurteilen. Zusätzlich hilft
+die Korrelationsmatrix aller Features, stark korrelierte Prädiktoren
+zu identifizieren (\textbf{Multikollinearität}), die redundante
+Information tragen und lineare Modelle destabilisieren können
+\cite{JamesEtAl2021,HastieEtAl2009}.
+
+\subsection{Standardisierung}
+
+Viele Algorithmen -- insbesondere Logistische Regression, SVM und MLP
+-- sind empfindlich auf unterschiedliche Skalen der Features: Ein Feature
+mit Werten im Bereich $[0, 1000]$ dominiert numerisch gegenüber einem
+Feature im Bereich $[0, 1]$, obwohl letzteres inhaltlich genauso wichtig
+sein kann \cite{JamesEtAl2021}. \textbf{Standardisierung} (auch
+Z-Score-Normierung) transformiert jedes Feature auf Mittelwert 0 und
+Standardabweichung 1:
+\begin{equation}
+    \tilde{x}_j = \frac{x_j - \mu_j}{\sigma_j}
+\end{equation}
+Dabei müssen $\mu_j$ und $\sigma_j$ ausschließlich aus den
+\textbf{Trainingsdaten} geschätzt werden. Die Anwendung auf die
+Testdaten erfolgt mit diesen Werten, um eine Datenkontamination zu
+vermeiden \cite{HastieEtAl2009}.
+
+\subsection{Train-Test-Split}
+
+Die grundlegende Strategie zur unverzerrten Schätzung der
+Generalisierungsleistung ist die Aufteilung des Datensatzes in einen
+\textbf{Trainingsdatensatz} (zum Modelltraining) und einen \textbf{Testdatensatz}
+(zur abschließenden, einmaligen Evaluation) \cite{JamesEtAl2021}.
+Um sicherzustellen, dass beide Teilmengen repräsentative Klassenverteilungen
+aufweisen, wird eine \textbf{stratifizierte} Aufteilung verwendet: Der
+Anteil von Heimsiegen, Unentschieden und Auswärtssiegen ist in Trainings-
+und Testset identisch. Dies ist bei Klassen-Imbalance besonders wichtig,
+da andernfalls die seltene Klasse im Testset unter- oder überrepräsentiert
+sein könnte \cite{JamesEtAl2021}.
+
+% =============================================================================
+\section{Dimensionsreduktion und Feature-Selektion}
 \label{sec:dimensionsreduktion}
-
-\textbf{Dimensionsreduktion} transformiert hochdimensionale Daten in einen niedrigerdimensionalen Raum \cite{JamesEtAl2021,Bishop2006}. Mit bis zu 70+ Features bei nur $\sim$2.900 Trainingsbeispielen ist dieses Verfahren für die vorliegende Arbeit relevant: Es reduziert Multikollinearität, bekämpft Overfitting und verbessert die Interpretierbarkeit.
+% =============================================================================
 
 \subsection{Der Fluch der Dimensionalität}
 
-Das Phänomen des \textbf{Curse of Dimensionality} \cite{Bellman1961} beschreibt, dass mit steigender Feature-Anzahl der Stichprobenraum exponentiell dünner wird, Distanzmetriken ihre Aussagekraft verlieren und die Gefahr des Overfittings wächst \cite{HastieEtAl2009}. Für die Fußballvorhersage gilt daher: \textbf{Mehr Features sind nicht automatisch besser}.
+Mit steigender Anzahl von Features wächst der Merkmalsraum exponentiell.
+\citet{Bellman1961} prägte dafür den Begriff des \textbf{Curse of
+Dimensionality}: In hochdimensionalen Räumen werden Datenpunkte
+zunehmend gleichweit voneinander entfernt, was Distanzmetriken und
+Ähnlichkeitsmaße ihre Aussagekraft verlieren lässt \cite{HastieEtAl2009}.
+Für die Fußballvorhersage bedeutet das: Mehr Features sind nicht
+automatisch besser. Redundante oder schwach prädiktive Features
+erhöhen die Modellkomplexität, fördern Overfitting und erschweren die
+Interpretation \cite{JamesEtAl2021}.
+
+\subsection{Feature-Selektion}
+
+\textbf{Feature-Selektion} wählt eine Teilmenge der ursprünglichen
+Features aus und behält dabei die Interpretierbarkeit der einzelnen
+Variablen \cite{GuyonElisseeff2003}. Drei Hauptkategorien lassen sich
+unterscheiden:
+
+\begin{itemize}
+    \item \textbf{Filter-Methoden} bewerten Features modellunabhängig
+          anhand statistischer Maße wie Pearson-Korrelation, Mutual
+          Information oder dem ANOVA-F-Test \cite{Fisher1935,CoverThomas2006}.
+          Sie sind schnell und transparent, berücksichtigen aber keine
+          Feature-Interaktionen.
+    \item \textbf{Wrapper-Methoden} wählen Features iterativ aus, indem
+          sie die tatsächliche Modellperformance als Auswahlkriterium
+          verwenden (z.\,B.\ Recursive Feature Elimination) \cite{KohaviJohn1997,GuyonEtAl2002}.
+          Sie sind genauer, aber rechenintensiv.
+    \item \textbf{Embedded-Methoden} integrieren die Selektion direkt in
+          das Modelltraining, z.\,B.\ über L1-Regularisierung (\textit{Lasso}),
+          die Koeffizienten unwichtiger Features auf null setzt
+          \cite{Tibshirani1996}, oder über tree-basierte Feature-Importance-
+          Werte \cite{Breiman2001,LundbergLee2017}.
+\end{itemize}
 
 \subsection{Principal Component Analysis (PCA)}
 
-Die \textbf{PCA} ist ein klassisches lineares Dimensionsreduktionsverfahren \cite{Pearson1901,Hotelling1933}. Sie sucht orthogonale Richtungen $\mathbf{w}_k$, entlang derer die Varianz der projizierten Daten maximal ist \cite{Jolliffe2002}:
+Die \textbf{Principal Component Analysis} (PCA) ist ein klassisches
+lineares Verfahren zur Dimensionsreduktion \cite{Pearson1901,Hotelling1933}.
+Im Gegensatz zur Feature-Selektion transformiert PCA die ursprünglichen
+Features in einen neuen Merkmalsraum aus orthogonalen
+\textbf{Hauptkomponenten}, die die Varianz der Daten maximal erklären
+\cite{Jolliffe2002}. Die $k$-te Hauptkomponente $\mathbf{w}_k$ ist
+die Richtung im Merkmalsraum, entlang derer die projizierte Varianz
+maximal ist und die orthogonal zu allen vorherigen Komponenten steht:
 \begin{equation}
-    \mathbf{w}_1 = \underset{\mathbf{w}: ||\mathbf{w}||=1}{\text{arg max}} \, \text{Var}(\mathbf{X}\mathbf{w}), \quad \mathbf{\Sigma} \mathbf{w}_k = \lambda_k \mathbf{w}_k
+    \mathbf{w}_k = \underset{\|\mathbf{w}\|=1,\; \mathbf{w} \perp \mathbf{w}_{1..k-1}}{\arg\max}\;
+    \operatorname{Var}(\mathbf{X}\mathbf{w}), \qquad
+    \boldsymbol{\Sigma}\, \mathbf{w}_k = \lambda_k\, \mathbf{w}_k
 \end{equation}
-In der Praxis wählt man die Anzahl der Komponenten $K$ so, dass $\geq$95\% der Varianz erhalten bleibt. PCA reduziert effektiv Multikollinearität, verliert aber die Interpretierbarkeit der ursprünglichen Features und ist sensitiv gegenüber Ausreißern und Skalierung \cite{Bishop2006}. In dieser Arbeit wird PCA als Baseline-Methode zur Dimensionsreduktion evaluiert.
+In der Praxis wählt man die Anzahl der Komponenten $K$ so, dass ein
+Mindestanteil der Gesamtvarianz (typischerweise $\geq 95\,\%$) erhalten
+bleibt. PCA ist besonders wirksam bei stark korrelierten Features
+(\textit{Multikollinearität}), da die ersten Hauptkomponenten gerade
+die gemeinsame Varianz mehrerer korrelierter Originalfeatures bündeln.
 
-\subsection{Feature Selection}
+Der Hauptnachteil der PCA ist der \textbf{Verlust der Interpretierbarkeit}:
+Die resultierenden Komponenten sind Linearkombinationen aller ursprünglichen
+Features und haben keine direkte inhaltliche Bedeutung mehr. Zudem
+ist PCA sensitiv gegenüber Ausreißern und erfordert eine vorherige
+Standardisierung \cite{Bishop2006}.
 
-Die \textbf{Feature Selection} wählt -- im Gegensatz zur PCA -- eine Teilmenge der ursprünglichen Features aus und erhält damit die Interpretierbarkeit \cite{GuyonElisseeff2003}. Drei Ansätze sind relevant:
-
-\begin{itemize}
-    \item \textbf{Filter-Methoden:} Modellunabhängige Bewertung via Korrelation, Mutual Information oder ANOVA F-Test \cite{Fisher1935,CoverThomas2006}.
-    \item \textbf{Wrapper-Methoden:} Iterative Auswahl (Forward Selection, Backward Elimination, RFE) basierend auf Modellperformance \cite{KohaviJohn1997,GuyonEtAl2002}.
-    \item \textbf{Embedded-Methoden:} L1-Regularisierung (Lasso) \cite{Tibshirani1996} und tree-basierte Feature-Importance \cite{Breiman2001,LundbergLee2017} integrieren die Selektion direkt ins Training.
-\end{itemize}
-
-In dieser Arbeit werden PCA sowie Feature Selection via Random-Forest- und XGBoost-Importance evaluiert und hinsichtlich ihrer Wirkung auf die Modellperformance verglichen.
-
-\section{Expected Goals -- Konzept und Anwendung}
+% =============================================================================
+\section{Expected Goals -- Konzept und verwandte Metriken}
 \label{sec:expected-goals}
+% =============================================================================
 
-\textbf{Expected Goals} (xG) quantifiziert die Qualität von Torchancen, indem jeder Schusssituation eine Torwahrscheinlichkeit zwischen 0 und 1 zugewiesen wird \cite{Spearman2018,AnzerBauer2021}. Als Kern liegt ein \textbf{binäres Klassifikationsproblem} vor:
+\subsection{Das Konzept der Expected Goals}
+
+\textbf{Expected Goals} (xG) ist eine fortgeschrittene Fußballstatistik,
+die jeder Torschusssituation eine Wahrscheinlichkeit zwischen 0 und 1
+zuweist -- die Wahrscheinlichkeit, dass aus dieser Situation ein Tor
+erzielt wird \cite{Spearman2018,AnzerBauer2021}. Formal liegt ein
+\textbf{binäres Klassifikationsproblem} vor:
 \begin{equation}
-    \text{xG}_i = P(\text{Tor}_i | \mathbf{x}_i) = f(\mathbf{x}_i), \quad \text{xG}_{\text{Team}} = \sum_{i=1}^{n} \text{xG}_i
+    \text{xG}_i = P(\text{Tor}_i \mid \mathbf{x}_i) = f(\mathbf{x}_i),
+    \qquad
+    \text{xG}_{\text{Team}} = \sum_{i=1}^{n} \text{xG}_i
 \end{equation}
-Die Entwicklung verlief in drei Phasen \cite{Wheatcroft2022}: Prä-xG-Ära (vor 2010, nur Rohdaten), Entstehungsphase (2010--2015, erste logistische Regressionsmodelle) und modernes xG (seit 2015, ML-Verfahren wie Gradient Boosting mit AUC $>$ 0,85 \cite{AnzerBauer2021}).
+Dabei ist $\mathbf{x}_i$ ein Merkmalsvektor, der die relevanten
+Kontextfaktoren der Schusssituation $i$ beschreibt. Der Wert
+$\text{xG}_{\text{Team}}$ ist die Summe aller Einzelchancen und
+entspricht den \emph{erwarteten} Toren eines Teams in einem Spiel.
 
-Wesentliche \textbf{Feature-Kategorien} moderner xG-Modelle umfassen geometrische Faktoren (Schussdistanz, -winkel, Strafraum-Position), Körperteil (Fußschuss vs.\ Kopfball mit $\sim$0,25 vs.\ $\sim$0,15 xG \cite{PalmerEtAl2021}), Vorlagentyp (Flanke, Pass, Elfmeter $\sim$0,76) sowie Kontext- und Druckfaktoren (Anzahl Verteidiger, Torwart-Position, Spielzustand) \cite{AnzerBauer2021,BauerEpstein2023,FernandezEtAl2021}.
+Die Entwicklung moderner xG-Modelle verlief in drei Phasen
+\cite{Wheatcroft2022}: In der \textbf{Prä-xG-Ära} (vor 2010) wurden
+ausschließlich Rohdaten wie Schussanzahl genutzt. Die \textbf{Entstehungsphase}
+(2010--2015) führte erste logistische Regressionsmodelle auf Basis von
+Schussdistanz und -winkel ein. Seit 2015 dominieren \textbf{moderne
+xG-Modelle} auf Basis von Gradient Boosting, die AUC-Werte von über
+0,85 erreichen \cite{AnzerBauer2021}.
 
-Die \textbf{Anwendungsbereiche} reichen von der Teamleistungsanalyse (Regression zum Mittelwert, xG-Maps) über Spielerscouting (xG-Overperformance als Maß für Abschlussqualität) bis zur \textbf{Spielvorhersage}: EWA-basierte xG-Durchschnitte erfassen die Teamform präziser als reine Torzahlen; xGA misst defensive Stabilität robuster als kassierte Tore \cite{HubacekSourekZelezny2019,VanEetveldeEtAl2024}. Zu den \textbf{Limitationen} zählen Modell-Abhängigkeit (kein Goldstandard), fehlende Kontextdaten bei öffentlichen Modellen sowie Liga-Spezifität \cite{Wheatcroft2022,BauerEpstein2023}.
+\subsection{Einflussgrößen moderner xG-Modelle}
 
-In dieser Arbeit werden folgende xG-basierte Features entwickelt, basierend auf Understat-Daten \cite{Understat2024}:
+Die wesentlichen Feature-Kategorien moderner xG-Modelle umfassen
+\cite{AnzerBauer2021,BauerEpstein2023,PalmerEtAl2021}:
+
 \begin{itemize}
-    \item \textbf{Team-xG (EWA) / Team-xGA (EWA):} Exponentiell geglättete Durchschnitte der letzten 5 Spiele.
-    \item \textbf{xG-Differenz:} Heimteam-xG minus Auswärtsteam-xG.
-    \item \textbf{xG-Overperformance:} Differenz zwischen tatsächlichen Toren und xG.
-    \item \textbf{Heim-/Auswärts-xG:} Separate xG-Metriken für Heim- und Auswärtsauftritte.
+    \item \textbf{Geometrische Faktoren:} Schussdistanz zum Tor,
+          Schusswinkel, Position im Strafraum. Ein Schuss aus dem
+          Elfmeterpunkt hat einen xG-Wert von ca.\ 0,76
+          \cite{PalmerEtAl2021}.
+    \item \textbf{Körperteil:} Schüsse mit dem starken Fuß
+          ($\sim$0,25 xG) erzielen im Durchschnitt höhere Werte als
+          Kopfbälle ($\sim$0,15 xG) oder der schwache Fuß \cite{PalmerEtAl2021}.
+    \item \textbf{Vorlagentyp:} Flanke, direkter Pass, Abpraller oder
+          Elfmeter -- der Entstehungsweg beeinflusst die Abschlussqualität.
+    \item \textbf{Druck- und Kontextfaktoren:} Anzahl verteidigender
+          Spieler, Torwartposition, Spielstand.
 \end{itemize}
-Die zentrale Forschungsfrage lautet, ob diese Features die Vorhersagegenauigkeit signifikant verbessern -- gestützt durch internationale Studien \cite{AnzerBauer2021,VanEetveldeEtAl2024,HubacekSourekZelezny2019}.
 
+\subsection{Verwandte Metriken: xGA und xPTS}
+
+Neben xG sind zwei abgeleitete Metriken für die Teamleistungsanalyse
+und Spielvorhersage relevant:
+
+\textbf{Expected Goals Against (xGA)} ist das xG-Äquivalent auf
+defensiver Seite: Es quantifiziert, wie viele Tore ein Team hätte
+erwarten können zu kassieren, basierend auf den Schusssituationen,
+die es zugelassen hat. xGA misst defensive Stabilität robuster als
+die tatsächlich kassierten Tore, da es überragende Torwartleistungen
+herausrechnet und den zufälligen Effekt von Wecheln der Effektivität
+normalisiert \cite{VanEetveldeEtAl2024}.
+
+\textbf{Expected Points (xPTS)} kombiniert xG und xGA auf Spielebene:
+Aus den erwarteten Torverteilungen beider Teams wird simuliert, welchen
+Punkteanteil jedes Team langfristig erwarten kann. xPTS ist ein
+stabiler Indikator für die \glqq verdiente\grqq{} Ligaposition eines
+Teams und identifiziert Over- und Underperformance zuverlässig
+\cite{Wheatcroft2022}.
+
+\subsection{Warum xG traditionelle Statistiken übertr\textit{i}fft}
+
+Der zentrale Vorteil von xG gegenüber tatsächlichen Torzahlen liegt
+in der \textbf{größeren Stichprobenbasis}: Während in einem Bundesliga-Spiel
+durchschnittlich nur 2,86 Tore fallen, werden typischerweise 10 bis 20
+Torchancen erzeugt. Jede Chance liefert eine xG-Schätzung, sodass die
+Summe $\text{xG}_{\text{Team}}$ auf einer deutlich größeren Datenmenge
+basiert als die bloße Toranzahl \cite{AnzerBauer2021}. Dies macht xG
+stabiler gegenüber kurzfristigen Zufallsschwankungen und zu einem
+besseren Prädiktor für nachhaltige Teamleistung
+\cite{WheatcroftVanEetvelde2020,LiuEtAl2023}.
+
+Ein klassisches Beispiel ist die Leicester-City-Meisterschaft 2015/16:
+Traditionelle Statistiken spiegelten den Titelgewinn wider, doch xG
+zeigte, dass Leicester deutlich über seinen erwarteten Werten performte.
+In den Folgejahren pendelte sich die Teamleistung auf dem xG-entsprechenden
+Niveau ein -- die Meisterschaft war teilweise ein statistischer Ausreißer
+\cite{Wheatcroft2022}.
+
+\subsection{Limitationen von xG}
+
+Trotz seiner Stärken unterliegt xG mehreren \textbf{Limitationen}
+\cite{Wheatcroft2022,BauerEpstein2023}: Erstens existiert kein einheitlicher
+Goldstandard -- verschiedene Anbieter berechnen xG unterschiedlich,
+was Vergleiche zwischen Datenquellen erschwert. Zweitens fehlen in
+öffentlich verfügbaren Datensätzen häufig detaillierte Kontextfaktoren
+wie Torwartposition oder Drucksituation. Drittens ist xG
+\textbf{ligaspezifisch}: Ein auf Premier-League-Daten trainiertes
+xG-Modell kann aufgrund unterschiedlicher Spielstile (die Bundesliga
+weist traditionell eine höhere Torrate auf) für die Bundesliga
+suboptimale Schätzungen liefern. Diese Einschränkungen unterstreichen
+die Bedeutung ligaspezifisch kalibrierter xG-Daten.
+
+% =============================================================================
+\section{Evaluationsmetriken für Klassifikationsmodelle}
+\label{sec:evaluationsmetriken}
+% =============================================================================
+
+Die Güte eines Klassifikationsmodells lässt sich anhand mehrerer
+komplementärer Metriken beurteilen. Im Kontext der Fußballvorhersage
+mit drei ungleich häufigen Klassen sind folgende Kennzahlen relevant.
+
+\subsection{Grundlegende Metriken: Precision, Recall und F1-Score}
+
+Ausgehend von der \textbf{Konfusionsmatrix} -- einer $K \times K$-Matrix,
+die für jede Kombination aus tatsächlicher und vorhergesagter Klasse
+die Anzahl der Beobachtungen zeigt -- lassen sich pro Klasse $k$ drei
+Metriken ableiten \cite{Powers2020}:
+
+\begin{itemize}
+    \item \textbf{Precision$_k$:} Der Anteil der korrekt als Klasse $k$
+          vorhergesagten Beobachtungen an allen als $k$ vorhergesagten:
+          $\text{Prec}_k = \frac{TP_k}{TP_k + FP_k}$.
+    \item \textbf{Recall$_k$:} Der Anteil der korrekt als Klasse $k$
+          erkannten Beobachtungen an allen tatsächlich zur Klasse $k$
+          gehörenden: $\text{Rec}_k = \frac{TP_k}{TP_k + FN_k}$.
+    \item \textbf{F1-Score$_k$:} Das harmonische Mittel aus Precision
+          und Recall: $F1_k = \frac{2 \cdot \text{Prec}_k \cdot \text{Rec}_k}{\text{Prec}_k + \text{Rec}_k}$.
+\end{itemize}
+
+\subsection{Macro-F1, Accuracy und Kalibrierung}
+
+\textbf{Accuracy} ist der Anteil korrekt klassifizierter Beobachtungen
+an allen Beobachtungen. Bei unausgewogenen Klassen ist sie irreführend:
+Ein Modell, das immer \glqq Heimsieg\grqq{} vorhersagt, erzielt bereits
+ca.\ 45\,\% Accuracy, ohne echtes Wissen über das Spiel zu haben
+\cite{Powers2020}.
+
+Der \textbf{Macro-F1-Score} ist das arithmetische Mittel der
+klassenspezifischen F1-Scores:
+\begin{equation}
+    F1_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K} F1_k
+\end{equation}
+Er gewichtet alle Klassen gleich, unabhängig von ihrer Häufigkeit.
+Ein Modell, das Unentschieden vollständig ignoriert, erhält einen
+$F1_D = 0$ und damit einen deutlich niedrigeren Macro-F1, selbst wenn
+Accuracy und Heimsieg-F1 hoch sind \cite{Powers2020,HeGarcia2009}.
+
+\textbf{Kalibrierung} beschreibt, ob die vorhergesagten
+Klassenwahrscheinlichkeiten mit den empirischen Häufigkeiten
+übereinstimmen: Ein gut kalibriertes Modell, das einem Spiel eine
+70\,\%-Heimsieg-Wahrscheinlichkeit zuweist, sollte in 70\,\% der
+Fälle, in denen es diese Wahrscheinlichkeit vorhersagt, tatsächlich
+ein Heimsieg eingetreten sein \cite{JamesEtAl2021}.
+
+\subsection{Feature Importance und Modellstabilität}
+
+\textbf{Feature Importance} beschreibt, wie stark einzelne Features
+zur Modellentscheidung beitragen. Für baumbasierte Modelle wird sie
+über den mittleren Gini-Gewinn über alle Splits und Bäume berechnet
+\cite{Breiman2001}. Eine hohe Feature Importance eines xG-Features
+würde empirisch belegen, dass xG-Informationen für die Vorhersage
+entscheidend sind \cite{LundbergLee2017}.
+
+\textbf{Modellstabilität} beschreibt die Konsistenz der
+Modellperformance über verschiedene Datensplits. Stark schwankende
+F1-Werte über die Faltungen der Kreuzvalidierung deuten auf
+Overfitting oder eine geringe Datenbasis hin und sind ein Warnsignal
+für mangelnde Generalisierbarkeit \cite{JamesEtAl2021}.
+
+% =============================================================================
 \section{Zusammenfassung}
-\label{sec:zusammenfassung}
+\label{sec:zusammenfassung-grundlagen}
+% =============================================================================
 
-Dieses Kapitel hat die theoretischen Grundlagen für die Vorhersage von Bundesliga-Spielergebnissen dargelegt:
+Dieses Kapitel hat die theoretischen Grundlagen für die Vorhersage von
+Bundesliga-Spielergebnissen dargelegt:
 
 \begin{itemize}
-    \item \textbf{Machine Learning} bietet einen geeigneten Rahmen für die Modellierung komplexer, nicht-linearer Zusammenhänge. Die eingesetzten Algorithmen (Logistische Regression, Random Forest, XGBoost, LightGBM, MLP) decken ein breites Spektrum an Modellkapazität und Interpretierbarkeit ab.
-    \item \textbf{Sports Analytics} hat im Fußball erheblich an Bedeutung gewonnen; die Spielvorhersage ist ein aktives Forschungsfeld mit praktischer Relevanz für Vereine, Medien und die Wettindustrie.
-    \item \textbf{Die Vorhersagbarkeit von Fußballergebnissen} ist prinzipiell begrenzt durch irreduziblen Fehler, emergente Nicht-Linearitäten, deterministisches Chaos und epistemologische Grenzen. Realistische Accuracy-Werte liegen bei 50--60\%.
-    \item \textbf{Dimensionsreduktion} (PCA, Feature Selection) kann bei hochdimensionalen Feature-Sets Multikollinearität reduzieren und Overfitting kontrollieren.
-    \item \textbf{Expected Goals} ist eine etablierte Metrik zur Quantifizierung von Torchancenqualität. Internationale Studien belegen den prädiktiven Wert von xG-Features; diese Arbeit validiert dies im Kontext der Bundesliga.
+    \item \textbf{Machine Learning als überwachtes Klassifikationsproblem}
+          mit drei Klassen und Klassen-Imbalance erfordert spezifische
+          Techniken: class weights, sample weights oder oversampling sowie
+          robuste Metriken wie Macro-F1 statt reiner Accuracy.
+    \item \textbf{Overfitting und Underfitting} sind über das
+          Bias-Varianz-Dilemma theoretisch fundiert; Early Stopping,
+          Regularisierung und Kreuzvalidierung sind die zentralen
+          Gegenmaßnahmen.
+    \item \textbf{Fünf Algorithmen} -- Logistische Regression, Random
+          Forest, XGBoost, LightGBM und MLP -- decken ein breites
+          Spektrum von Modellkomplexität und Interpretierbarkeit ab.
+    \item \textbf{Vorhersagbarkeit multivariater Ereignisse} ist durch
+          irreduziblen Fehler, emergente Nicht-Linearitäten und fehlende
+          Einflussvariablen fundamental begrenzt. EWA und Rolling Windows
+          ermöglichen eine zeitvalide Formabbildung; Data Leakage muss
+          konsequent vermieden werden.
+    \item \textbf{Dimensionsreduktion} durch PCA und Feature-Selektion
+          bekämpft den Curse of Dimensionality und reduziert Multikollinearität.
+    \item \textbf{Expected Goals} (xG), xGA und xPTS sind robustere
+          Leistungsindikatoren als reine Torstatistiken und bilden die
+          Grundlage für das erweiterte Feature-Set dieser Arbeit.
 \end{itemize}
 
-Aufbauend auf diesen theoretischen Grundlagen wird in Kapitel \ref{chap:relatedwork} der aktuelle Stand der Forschung zu maschinellem Lernen und Expected Goals im Fußball beleuchtet.
+Aufbauend auf diesen Grundlagen gibt Kapitel~\ref{chap:relatedwork}
+einen Überblick über den aktuellen Stand der Forschung.
