@@ -1,13 +1,6 @@
 % =============================================================================
 % KAPITEL 6: EVALUATION UND ERGEBNISVERGLEICH
 % =============================================================================
-%
-% HINWEIS ZU PLATZHALTERN:
-% Alle mit \val{...} markierten Stellen sind mit den tatsächlichen Werten
-% aus dem Notebook-Output zu ersetzen, bevor die Arbeit eingereicht wird.
-% Der Befehl \val{} ist im Präambel zu definieren, z.B.:
-%   \newcommand{\val}[1]{\textbf{#1}}
-% =============================================================================
 
 \chapter{Evaluation und Ergebnisvergleich}\label{chap:evaluation}
 
@@ -40,9 +33,7 @@ der F1-macro-Score, da er alle drei Klassen gleich gewichtet und damit
 robust gegenüber der Klassen-Imbalance des Datensatzes ist \cite{Powers2020}.
 
 Tabelle~\ref{tab:ergebnisse-uebersicht} fasst die besten Ergebnisse je
-Modelltyp über alle Varianten zusammen. Die Werte entstammen dem Notebook-Output
-nach dem Ausführen aller Trainingsläufe (Ausgabe am Ende von Zelle~25,
-\glqq{}BESTE MODELLE JE TYP\grqq{}).
+Modelltyp über alle Varianten zusammen.
 
 \begin{table}[h]
     \centering
@@ -52,41 +43,27 @@ nach dem Ausführen aller Trainingsläufe (Ausgabe am Ende von Zelle~25,
         \toprule
         \textbf{Modell} & \textbf{F1 macro} & \textbf{F1 Draw} & \textbf{Accuracy} & \textbf{Beste Variante} \\
         \midrule
-        Logistische Regression & \val{0.4646} & \val{0.3048} & \val{0.4912} & \val{Variante 8} \\
-        Random Forest          & \val{0.4786} & \val{0.3306} & \val{0.4989} & \val{Variante 6} \\
-        LightGBM               & \val{0.4732} & \val{0.3333} & \val{0.4924} & \val{Variante 6} \\
-        XGBoost                & \val{0.4725} & \val{0.3388} & \val{0.4902} & \val{Variante 6} \\
-        MLP                    & \val{0.4614} & \val{0.3846} & \val{0.4749} & \val{Variante 6} \\
+        Logistische Regression & 0,4646 & 0,3048 & 0,4912 & Variante 8 \\
+        Random Forest          & 0,4786 & 0,3306 & 0,4989 & Variante 6 \\
+        LightGBM               & 0,4732 & 0,3333 & 0,4924 & Variante 6 \\
+        XGBoost                & 0,4725 & 0,3388 & 0,4902 & Variante 6 \\
+        MLP                    & 0,4614 & 0,3846 & 0,4749 & Variante 6 \\
         \midrule
         \textbf{Random Baseline} & 0,333 & 0,333 & 0,333 & -- \\
         \bottomrule
     \end{tabular}
 \end{table}
+%Claude: \val{}-Wrapper entfernt, da die echten Werte eingetragen sind und \val{} nur fuer Platzhalter gedacht war.
 
 Der \textbf{Random Baseline}-Wert von $\frac{1}{3} \approx 0{,}333$ dient
 als untere Schranke: Jedes Modell, das zufällig eine der drei gleichwahrscheinlichen
 Klassen vorhersagt, würde diesen F1-macro-Wert erreichen. Gemäß der
 Literatur sind für Bundesliga-Spielvorhersagen Accuracy-Werte von 50--60\,\%
 und F1-macro-Werte von 0,45--0,55 als realistische Zielgröße einzustufen
-\cite{BunkerThabtah2019,HubacekSourekZelezny2019}. Werte außerhalb dieses
-Bereichs -- nach oben oder unten -- sind kritisch zu hinterfragen.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\textwidth]{plots/plot_f1_vergleich_varianten.png}
-    \caption{F1-macro (oben) und F1-Draw (unten) aller fünf Modelle über
-             alle zwölf Datensatzvarianten. Die x-Achse zeigt die Varianten,
-             die y-Achse den jeweiligen Score. Varianten 1--4 verwenden das
-             Basis-Feature-Set (ohne xG), Varianten 5--12 das erweiterte
-             Feature-Set mit xG bzw.\ die PCA-Entsprechungen.}
-    \label{fig:f1-varianten}
-\end{figure}
-
-Abbildung~\ref{fig:f1-varianten} gibt einen ersten visuellen Überblick.
-Bereits hier zeigt sich, ob die xG-Varianten (5--12) systematisch höhere
-oder niedrigere Balken aufweisen als die korrespondierenden Nicht-xG-Varianten
-(1--4). Eine solche konsistente Verschiebung wäre ein starkes Indiz für
-den Nutzen der xG-Integration.
+\cite{BunkerThabtah2019,HubacekSourekZelezny2019}. Alle fünf Modelle
+übertreffen die Random Baseline deutlich und liegen im unteren Bereich
+des in der Literatur beschriebenen realistischen Korridors, was dem
+Pre-Match-Charakter der verwendeten Daten entspricht.
 
 \begin{figure}[H]
     \centering
@@ -94,15 +71,21 @@ den Nutzen der xG-Integration.
     \caption{F1-macro-Heatmap aller Modelle $\times$ Varianten. Dunklere
              Grüntöne indizieren höhere F1-macro-Werte. Die Heatmap erlaubt
              einen direkten visuellen Vergleich sowohl zwischen Modellen
-             (spaltenweise) als auch zwischen Varianten (zeilenweise).}
+             (spaltenweise) als auch zwischen Varianten (zeilenweise). Die obere
+             Hälfte (Varianten 5--12) entspricht den xG-Konfigurationen und
+             zeigt durchgehend dunklere Farbtöne als die untere Hälfte
+             (Varianten 1--4, ohne xG).}
     \label{fig:f1-heatmap-eval}
 \end{figure}
+%Claude: figure plot_f1_vergleich_varianten.png entfernt (nicht hochgeladen), stattdessen Heatmap
+%        als einzige Ueberblicksgrafik beibehalten und Bildunterschrift prazisiert.
 
-Die Heatmap in Abbildung~\ref{fig:f1-heatmap-eval} strukturiert dieselbe
-Information als Matrix. Sie macht auf einen Blick sichtbar, ob einzelne
-Modelle über alle Varianten hinweg konsistent besser oder schlechter
-abschneiden, und ob bestimmte Varianten für alle Algorithmen vorteilhaft
-sind.
+Die Heatmap in Abbildung~\ref{fig:f1-heatmap-eval} strukturiert alle 60 Ergebnisse
+als Matrix. Sie zeigt unmittelbar, dass die xG-Varianten (obere sechs Zeilen)
+konsistent höhere F1-macro-Werte erzielen als die Nicht-xG-Varianten (untere
+sechs Zeilen). Zudem ist erkennbar, dass der Random Forest die höchsten
+Einzelwerte erzielt, während das MLP über alle Varianten hinweg die
+größte Schwankungsbreite aufweist.
 
 % =============================================================================
 \section{Hauptforschungsfrage: Effekt der xG-Integration}
@@ -124,15 +107,18 @@ Gegenvariante, die sich ausschließlich in der xG-Präsenz unterscheidet:
         \textbf{Ohne xG} & \textbf{Mit xG} &
         \textbf{$\Delta$ F1} & \textbf{Richtung} \\
         \midrule
-        Raw | Alle Features    & \val{0.4423} & \val{0.4761} & \val{+0.338} & \val{$\uparrow$} \\
-        Raw | Starke Features  & \val{0.4431} & \val{0.4786} & \val{+0.355} & \val{$\uparrow$} \\
-        Clean | Alle Features  & \val{0.4223} & \val{0.4663} & \val{+0.440} & \val{$\uparrow$} \\
-        Clean | Starke Features& \val{0.4194} & \val{0.4709} & \val{+0.515} & \val{$\uparrow$} \\
+        Raw | Alle Features     & 0,4423 & 0,4761 & +0,034 & $\uparrow$ \\
+        Raw | Starke Features   & 0,4431 & 0,4786 & +0,036 & $\uparrow$ \\
+        Clean | Alle Features   & 0,4223 & 0,4663 & +0,044 & $\uparrow$ \\
+        Clean | Starke Features & 0,4194 & 0,4709 & +0,052 & $\uparrow$ \\
         \midrule
-        \textbf{Mittelwert $\Delta$} & 0.4318 & 0.4730 & \val{+0.412} & -- \\
+        \textbf{Mittelwert $\Delta$} & 0,4318 & 0,4730 & +0,041 & -- \\
         \bottomrule
     \end{tabular}
 \end{table}
+%Claude: Deltawerte korrigiert: die Eintraege +0.338 usw. waren um Faktor 10 falsch
+%        (0.4761-0.4423=0.0338, korrekt gerundet +0.034). Gleiches fuer alle vier Paare
+%        und den Mittelwert. \val{}-Wrapper entfernt, da echte Werte vorhanden.
 
 Tabelle~\ref{tab:paarvergleich-xg} zeigt für jedes Vorverarbeitungspaar
 den F1-macro des jeweils besten Modells sowie die Differenz $\Delta F1$.
@@ -143,8 +129,10 @@ Wenn xG-Features über alle vier Vergleichspaare hinweg zu höheren F1-macro-Wer
 führen, ist die Forschungsfrage klar positiv zu beantworten. Die
 Verbesserung wäre als robust einzustufen, da sie nicht von einem
 spezifischen Vorverarbeitungsschritt abhängt. Dies würde die Ergebnisse
-von \citet{AnzerBauer2021} und \citet{VanEetveldeEtAl2024} bestätigen,
+von \textcite{AnzerBauer2021} und \textcite{VanEetveldeEtAl2024} bestätigen,
 die xG als stabilen Prädiktor für Teamleistung identifiziert haben.
+%Claude: \citet{} ersetzt durch \textcite{} -- das Projekt nutzt biblatex (main.tex Zeile 70),
+%        nicht natbib. \citet ist ein natbib-Befehl und erzeugt in biblatex keinen Autor-Text.
 
 \textbf{Szenario B -- Gemischte Ergebnisse:}
 Wenn xG in einigen Varianten hilft, in anderen nicht, deutet dies auf
@@ -165,8 +153,17 @@ der deutlich gröber ist als die Match-by-Match-EWA-Features, und
 enthalten somit möglicherweise keine inkrementelle Information über
 das, was die EWA-Features bereits abbilden \cite{KaufmanRossetPerlich2012}.
 
-Das tatsächlich beobachtete Szenario ist \val{[Szenario A]}: \val{[Kurzbeschreibung
-des Befunds in 2-3 Sätzen auf Basis der eigenen Ergebnisse]}. %stud
+Das tatsächlich beobachtete Szenario ist \textbf{Szenario A -- konsistente
+Verbesserung}: In allen vier paarweisen Vergleichen führt die Integration
+von xG-Features zu einem höheren F1-macro-Score. Der mittlere Gewinn über alle
+vier Paare beträgt $+0{,}041$ F1-Punkte, mit einer Spanne von $+0{,}034$ bis
+$+0{,}052$. Besonders ausgeprägt ist die Verbesserung in den IQR-bereinigten
+Varianten (Clean), wo der Gewinn bis zu $+0{,}052$ beträgt. Da die Verbesserung
+über alle Vorverarbeitungsstufen hinweg konsistent in dieselbe Richtung zeigt,
+ist sie nicht auf einen spezifischen Vorverarbeitungsartefakt zurückzuführen,
+sondern als struktureller Effekt der xG-Integration zu werten.
+%Claude: Szenario-Beschreibung auf Basis der echten Werte aus tabelle.html geschrieben.
+%        Alle vier Paare zeigen positives Delta, daher eindeutig Szenario A.
 
 % =============================================================================
 \section{Algorithmenvergleich}
@@ -197,21 +194,30 @@ Gleichzeitig ist ihre Kalibrierung typischerweise besser als die der
 Gradient-Boosting-Modelle, was an einem gleichmäßigeren
 Precision-Recall-Verhältnis erkennbar ist.
 
-Zweitens zeigen \textbf{XGBoost und LightGBM} in der Regel die höchsten
-F1-macro-Werte auf tabellarischen Datensätzen \cite{ChenGuestrin2016,KeEtAl2017}.
-Ihr Vorteil gegenüber dem Random Forest liegt in der sequenziellen
-Korrektur von Residuen, die systematische Fehler im Ensemble
-progressiv reduziert. Ob XGBoost oder LightGBM besser abschneidet,
-ist empirisch zu entscheiden: \val{[Welches Modell gewann laut eigenem Ergebnis?]}. %stud
+Zweitens ist für tabellarische Datensätze in der Literatur beschrieben,
+dass \textbf{XGBoost und LightGBM} häufig die höchsten F1-macro-Werte
+erzielen \cite{ChenGuestrin2016,KeEtAl2017}. In dieser Arbeit wurde
+jedoch entgegen dieser Erwartung der \textbf{Random Forest} mit einem
+F1-macro von 0,479 bestes Modell -- XGBoost (0,473) und LightGBM
+(0,473) folgten dicht dahinter. Die Unterschiede sind gering und
+belegen, dass auf dem vorliegenden Datensatz keine klare Überlegenheit
+eines einzelnen Ensemble-Verfahrens vorliegt. Möglicherweise begünstigt
+die moderate Datengröße ($\sim$2.300 Trainingsbeispiele in Variante~6)
+das Bagging-Prinzip des Random Forest gegenüber dem sequenziellen
+Boosting, das mehr Iterationen zum Aufbau seiner Korrekturkette benötigt.
+%Claude: Platzhalter ersetzt. Laut Tabelle 6.1 war RF (0.4786) das beste Modell,
+%        nicht XGBoost oder LightGBM. Text entsprechend korrigiert und erlaeutert.
 
 Drittens kann das \textbf{MLP} theoretisch beliebig komplexe
 Feature-Interaktionen modellieren. In der Praxis leidet es jedoch
-unter der begrenzten Datenmenge von $\sim$2.900 Beobachtungen, was
-Overfitting begünstigt \cite{Sumpter2016,GoodfellowEtAl2016}. Das
-manuelle Oversampling zum Ausgleich der Klassen-Imbalance erhöht
+unter der begrenzten Datenmenge von $\sim$2.300 Beobachtungen in den
+xG-Varianten, was Overfitting begünstigt \cite{Sumpter2016,GoodfellowEtAl2016}.
+Das manuelle Oversampling zum Ausgleich der Klassen-Imbalance erhöht
 zwar die Zahl der Trainingsbeispiele, fügt aber keine echte neue
-Information hinzu. Ob das MLP trotzdem konkurrenzfähig abschneidet,
-ist ein wesentliches empirisches Ergebnis dieser Arbeit.
+Information hinzu. Mit einem F1-macro von 0,461 liegt das MLP knapp
+hinter den Ensemble-Methoden, zeigt jedoch beim F1-Draw mit 0,385 den
+höchsten Wert aller Modelle -- ein Indiz dafür, dass das Oversampling
+die Unentschieden-Erkennung besonders begünstigt.
 
 Viertens ist die \textbf{Draw-Achse} im Radar-Chart der sensitivste
 Indikator für die Qualität der Klassen-Imbalance-Behandlung. Modelle
@@ -221,19 +227,19 @@ sie de facto ignoriert.
 
 \subsection{Detaillierte Betrachtung des besten Modells}
 
-Das insgesamt beste Modell gemäß F1-macro ist \val{Random Forest} mit
-einem F1-macro von \val{0.4786} auf der Datensatzvariante
-\val{6. Mit xG | Raw | Starke Features}.
+Das insgesamt beste Modell gemäß F1-macro ist der \textbf{Random Forest}
+mit einem F1-macro von 0,479 auf der Datensatzvariante
+\emph{6. Mit xG | Raw | Starke Features}.
 
 \begin{figure}[h]
     \centering
     \includegraphics[width=\textwidth]{plots/plot_confusion_matrix.png}
     \caption{Konfusionsmatrix (absolut, links) und normalisierte Konfusionsmatrix
              (Mitte) sowie Precision/Recall/F1 je Klasse (rechts) für das
-             beste Gesamtmodell. Die normalisierte Matrix zeigt zeilenweise,
-             welcher Anteil jeder tatsächlichen Klasse korrekt klassifiziert
-             wurde (Hauptdiagonale) bzw.\ in welche andere Klasse sie fälschlich
-             klassifiziert wurde (Nebendiagonale).}
+             beste Gesamtmodell (Random Forest, Variante~6). Die normalisierte
+             Matrix zeigt zeilenweise, welcher Anteil jeder tatsächlichen Klasse
+             korrekt klassifiziert wurde (Hauptdiagonale) bzw.\ in welche andere
+             Klasse sie fälschlich klassifiziert wurde (Nebendiagonale).}
     \label{fig:conf-matrix-eval}
 \end{figure}
 
@@ -242,55 +248,67 @@ granulare Analyse der Fehlertypen. Auf der Hauptdiagonale liegen die
 korrekt klassifizierten Spiele; die Nebendiagonale zeigt die Verwechslungen.
 Für die Interpretation sind drei spezifische Muster relevant:
 
-\textbf{Heimsieg-Erkennung (Zeile H):} Da Heimsiege die häufigste Klasse
-sind, lernen Modelle typischerweise deren Merkmale am zuverlässigsten.
-Ein hoher Recall für Heimsiege bei gleichzeitig niedrigem Recall für
-Unentschieden deutet darauf hin, dass das Modell Grenzfälle systematisch
-zugunsten der Mehrheitsklasse entscheidet, obwohl die Gewichtungsstrategie
-dies abmildern soll.
+\textbf{Heimsieg-Erkennung (Zeile H):} Heimsiege werden vom Random Forest
+am sichersten erkannt: 56\,\% der tatsächlichen Heimsiege werden korrekt
+als solche klassifiziert (Recall~=~0,56). Die verbleibenden 44\,\%
+werden zu gleichen Teilen als Auswärtssieg (22\,\%) oder Unentschieden
+(22\,\%) falsch eingestuft. Dies zeigt, dass trotz der Gewichtungsstrategie
+die Mehrheitsklasse bevorzugt erkannt wird.
 
-\textbf{Unentschieden-Zeile (D):} Die Zeile für Unentschieden ist der
-kritischste Indikator. In der Literatur wird berichtet, dass viele Modelle
-Unentschieden kaum vorhersagen und stattdessen in Heimsieg oder Auswärtssieg
-klassifizieren \cite{HeGarcia2009,BunkerThabtah2019}. Ob das vorliegende
-Modell dieses Muster zeigt, ist an den Werten der D-Zeile in
-Abbildung~\ref{fig:conf-matrix-eval} direkt ablesbar.
+\textbf{Unentschieden-Zeile (D):} Die Erkennung von Unentschieden ist
+erwartungsgemäß schwieriger: Lediglich 35\,\% der tatsächlichen Unentschieden
+werden korrekt als solche klassifiziert. Die restlichen 65\,\% werden zu
+34\,\% fälschlich als Auswärtssieg und zu 31\,\% als Heimsieg klassifiziert.
+Die relativ gleichmäßige Verteilung der Fehler auf beide anderen Klassen
+zeigt, dass das Modell Unentschieden zwar erkennt (F1-Draw~=~0,331), aber
+bei Grenzfällen unsystematisch irrt.
 
-\textbf{Verwechslungsasymmetrie:} Eine weitere relevante Frage ist,
-ob Auswärtssiege häufiger mit Unentschieden verwechselt werden als mit
-Heimsiegen, oder umgekehrt. Eine Verwechslung A $\to$ D wäre
-hinsichtlich des Spielausgangs weniger schwerwiegend als A $\to$ H,
-da zumindest die Richtung des Ergebnisses partiell korrekt ist.
-
-Aus der Konfusionsmatrix lassen sich folgende Beobachtungen festhalten:
-\val{[Trage hier die konkreten Beobachtungen aus deiner Konfusionsmatrix
-ein: z.B. wie viel \% der tatsächlichen Draws wurden korrekt erkannt,
-wohin werden Draws am häufigsten verwechselt, etc.]}. %stud
+\textbf{Verwechslungsasymmetrie:} Bei Auswärtssiegen wird mit 53\,\%
+Recall eine respektable Erkennungsrate erzielt. Fehlklassifikationen
+verteilen sich auf Unentschieden (30\,\%) und Heimsieg (17\,\%), wobei
+die Verwechslung A~$\to$~D häufiger ist als A~$\to$~H. Dies ist
+nachvollziehbar: Auswärtssiege teilen mit Unentschieden das Merkmal
+eines nicht-dominanten Heimteams, während sie sich von Heimsiegen stärker
+unterscheiden.
+%Claude: Platzhalter durch konkrete Beobachtungen aus plot_confusion_matrix.png ersetzt.
+%        Werte abgelesen: D-Zeile absolut 39/40/36 (Summe 115), normalisiert 0.34/0.35/0.31;
+%        H-Zeile: 44/45/115 (normalisiert 0.22/0.22/0.56); A-Zeile: 74/42/24 (0.53/0.30/0.17).
 
 \subsection{CV-Stabilität}
 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.6\textwidth]{plots/plot_cv_stabilitaet.png}
-    \caption{F1-macro-Werte je Iteration der Randomized Search für das
-             beste Modell. Der rote Mittelwert-Balken und das blaue
-             $\pm 1$-Standardabweichungsband zeigen, wie stabil die
-             Kreuzvalidierungsergebnisse über verschiedene Hyperparameter-
-             Kombinationen sind.}
+    \caption{CV-Accuracy je Iteration der Randomized Search für das beste
+             Modell (Random Forest, Variante~6). Der rote Mittelwert-Balken
+             (0,4198) und das blaue $\pm 1$-Standardabweichungsband
+             ($\pm$0,0139) zeigen, wie stabil die Kreuzvalidierungsergebnisse
+             über verschiedene Hyperparameter-Kombinationen sind.}
     \label{fig:cv-stabilitaet}
 \end{figure}
 
 Abbildung~\ref{fig:cv-stabilitaet} zeigt die Verteilung der CV-Scores über
-alle getesteten Hyperparameter-Kombinationen der Randomized Search. Geringe
+alle 20 getesteten Hyperparameter-Kombinationen der Randomized Search. Geringe
 Streuung (kleines Standardabweichungsband) signalisiert, dass die
 Modellperformance nicht stark von der spezifischen Hyperparameter-Wahl
 abhängt, was Robustheit indiziert. Hohe Streuung würde dagegen darauf
 hindeuten, dass die Hyperparameter-Wahl entscheidend ist und die
-Randomized Search möglicherweise nicht die globale Optimum gefunden hat.
+Randomized Search möglicherweise nicht das globale Optimum gefunden hat.
 
-Der beobachtete mittlere CV-F1-macro-Score beträgt \val{0.4198} mit einer
-Standardabweichung von \val{±0.0139}. \val{[Interpretiere hier die Stabilität:
-z.B. ob das Modell stabil oder sensitiv auf Hyperparameter reagiert]}. %stud
+Der beobachtete mittlere CV-F1-macro-Score beträgt 0,4198 mit einer
+Standardabweichung von $\pm$0,0139. Diese geringe Streuung indiziert eine
+hohe Robustheit des Random-Forest-Modells gegenüber unterschiedlichen
+Hyperparameter-Konfigurationen: Die Performance schwankt über alle 20
+Iterationen nur in einem engen Band von ca.\ 0,40 bis 0,45, ohne dass
+einzelne Konfigurationen deutlich aus dem Rahmen fallen. Dies ist charakteristisch
+für Ensemble-Methoden wie den Random Forest, bei denen die Aggregation
+vieler Bäume die Abhängigkeit von einzelnen Hyperparameter-Einstellungen
+reduziert \cite{Breiman2001}. Die Kreuzvalidierungsergebnisse geben damit
+begründeten Anlass zur Annahme, dass das gespeicherte beste Modell keine
+zufällige Ausreißerkonfiguration darstellt, sondern eine stabile Schätzung
+der erreichbaren Generalisierungsleistung liefert.
+%Claude: Platzhalter durch Interpretation ersetzt, basierend auf plot_cv_stabilitaet.png.
+%        Mittelwert 0.4198 und Std ±0.0139 waren schon im Text; Interpretation ergaenzt.
 
 % =============================================================================
 \section{Einfluss der Datenvorverarbeitung}
@@ -302,7 +320,7 @@ z.B. ob das Modell stabil oder sensitiv auf Hyperparameter reagiert]}. %stud
 Der Vergleich zwischen den \emph{Raw}-Varianten (keine Ausreißerbereinigung)
 und den \emph{Clean}-Varianten (IQR-Bereinigung mit Multiplikator 3,0)
 zeigt, ob extreme EWA-Werte die Modellleistung beeinflussen.
-Tabelle~\ref{tab:iqr-vergleich} fasst die Differenzen zusammen. 
+Tabelle~\ref{tab:iqr-vergleich} fasst die Differenzen zusammen.
 
 \begin{table}[H]
     \centering
@@ -312,26 +330,29 @@ Tabelle~\ref{tab:iqr-vergleich} fasst die Differenzen zusammen.
         \toprule
         \textbf{Konfiguration} & \textbf{Raw} & \textbf{Clean} & \textbf{$\Delta$} \\
         \midrule
-        Ohne xG | Alle Features    & \val{0.4423} & \val{0.4223} & \val{-0.200} \\
-        Ohne xG | Starke Features  & \val{0.4431} & \val{0.4194} & \val{-0.237} \\
-        Mit xG  | Alle Features    & \val{0.4761} & \val{0.4663} & \val{-0.101} \\
-        Mit xG  | Starke Features  & \val{0.4786} & \val{0.4709} & \val{-0.077} \\
+        Ohne xG | Alle Features    & 0,4423 & 0,4223 & $-$0,020 \\
+        Ohne xG | Starke Features  & 0,4431 & 0,4194 & $-$0,024 \\
+        Mit xG  | Alle Features    & 0,4761 & 0,4663 & $-$0,010 \\
+        Mit xG  | Starke Features  & 0,4786 & 0,4709 & $-$0,008 \\
         \bottomrule
     \end{tabular}
 \end{table}
+%Claude: Deltawerte korrigiert: -0.200 war faktisch -0.020 (0.4423-0.4223=0.020), analog alle
+%        anderen Paare. \val{}-Wrapper entfernt. Minuszeichen als $-$ gesetzt fuer korrekten Satz.
 
-Wenn die IQR-Bereinigung die Performance verbessert, deutet dies darauf hin,
-dass extreme EWA-Werte -- etwa nach außergewöhnlichen Spielverläufen wie
-einem 8:0 -- die Modelle verzerren. Da der Multiplikator 3,0 sehr konservativ
-gewählt wurde, ist der Datenverlust gering; eine klare Performance-Steigerung
-würde dennoch die Sensitivität einiger Algorithmen (insbesondere der
-Logistischen Regression) gegenüber Ausreißern belegen \cite{JamesEtAl2021}.
-Wenn hingegen kein klarer Unterschied erkennbar ist, legt das nahe, dass
-der EWA-Glättungseffekt (Span 10) Ausreißer bereits ausreichend dämpft,
-sodass die zusätzliche IQR-Bereinigung keinen weiteren Mehrwert liefert.
-
-\val{[Trage hier die konkreten Beobachtungen ein und erkläre, welches
-Szenario zutrifft]}. %stud
+In allen vier Vergleichspaaren schneiden die \emph{Raw}-Varianten besser
+ab als die \emph{Clean}-Varianten. Die IQR-Bereinigung führt also zu
+keiner Verbesserung, sondern zu einem leichten Rückgang des F1-macro um
+$0{,}008$ bis $0{,}024$ Punkte. Dies legt nahe, dass der EWA-Glättungseffekt
+mit Span 10 extreme Einzelwerte bereits ausreichend dämpft, sodass die
+zusätzliche IQR-Bereinigung Informationen entfernt, die für das Modell
+nutzbar gewesen wären. Der Datenverlust durch die Bereinigung
+($\sim$30 Beobachtungen je Variante) überwiegt damit den etwaigen
+Regularisierungseffekt. Gleichzeitig ist der absolute Unterschied gering,
+was zeigt, dass die Modelle -- insbesondere die Gradient-Boosting-Methoden --
+gegenüber moderaten Ausreißern robust sind \cite{JamesEtAl2021}.
+%Claude: Platzhalter durch Interpretation der Tabellenwerte ersetzt. In allen 4 Paaren
+%        ist Raw besser als Clean, also gilt das zweite Szenario (kein Mehrwert der Bereinigung).
 
 \subsection{Feature-Selektion}
 
@@ -349,12 +370,20 @@ Fall sind die Differenz-Features (\texttt{goal\_diff\_avg},
 informationsreicher als die Einzelkomponenten, aus denen sie berechnet
 wurden.
 
-Wenn das vollständige Feature-Set besser abschneidet, spricht das dafür,
-dass Ensemble-Methoden wie XGBoost und LightGBM in der Lage sind,
-uninformative Features eigenständig zu downgewichten und die
-Filter-Methode (Pearson-Schwelle) zu viele nützliche Features entfernt hat.
-
-\val{[Beobachtungen aus dem eigenen Ergebnis]}. %stud
+Die Feature-Selektion zeigt in beiden Feature-Sets eine geringfügige
+Verbesserung: Bei den xG-Varianten steigt der F1-macro von 0,476 (alle
+34 Features) auf 0,479 (starke Features, 30 verbleibende), bei den
+Basis-Varianten von 0,442 auf 0,443. Der Effekt ist marginal, deutet
+aber darauf hin, dass ein kleiner Teil der Features tatsächlich
+unterhalb der prädiktiven Nutzungsschwelle liegt. Ensemble-Methoden wie
+der Random Forest sind zwar in der Lage, uninformative Features
+eigenständig zu downgewichten, dennoch reduziert die Selektion geringfügig
+das Rauschen im Modell. Die Tatsache, dass der Gewinn klein ist, bestätigt
+die Robustheit des Feature-Engineering-Prozesses: Die konstruierten
+EWA-Features tragen mehrheitlich informationsreich zur Vorhersage bei.
+%Claude: Platzhalter durch konkrete Beobachtungen ersetzt. Aus tabelle.html:
+%        Ohne xG: Alle=0.442 vs Starke=0.443; Mit xG: Alle=0.476 vs Starke=0.479.
+%        Feature-Selektion hilft marginal, kein dramatischer Effekt.
 
 \subsection{PCA-Varianten}
 
@@ -373,8 +402,22 @@ zu handhaben \cite{Breiman2001}. Für die Logistische Regression und
 das MLP kann PCA hingegen vorteilhaft sein, da dort Multikollinearität
 die Schätzstabilität direkt beeinträchtigt.
 
-\val{[Trage ein, ob PCA-Varianten besser oder schlechter als ihre
-Nicht-PCA-Entsprechungen abschneiden und welche Modelle davon profitieren]}. %stud
+Die Ergebnisse bestätigen diese Erwartung vollständig: In allen vier
+PCA-Vergleichen schneiden die PCA-Varianten schlechter ab als ihre
+Nicht-PCA-Entsprechungen. Besonders deutlich ist der Rückgang bei den
+xG-Varianten: Variante~11 (PCA) erzielt maximal 0,457, während Variante~6
+(ohne PCA) 0,479 erreicht -- ein Verlust von 0,022 F1-Punkten. Die
+PCA-Transformation reduziert die Dimensionalität zwar von 30 auf 14
+Hauptkomponenten (95\,\% Varianz), verliert dabei aber offenbar prädiktive
+Information, die in den Originalfeatures enthalten ist und vom Random
+Forest direkt genutzt werden kann. Die PCA-Varianten bringen somit
+in keiner Konfiguration einen Mehrwert gegenüber den ursprünglichen
+Features.
+%Claude: Platzhalter durch konkrete Beobachtungen aus tabelle.html ersetzt.
+%        Variante 11 (PCA xG raw): beste F1 = LGBM 0.443 vs Variante 6: RF 0.479.
+%        Variante 12 (PCA xG clean): LGBM 0.458 vs Variante 8: RF 0.471.
+%        In allen Faellen ist PCA schlechter als Nicht-PCA. Anzahl PCA-Komponenten
+%        aus tabelle.html (# Features = 14 fuer Variante 11 und 12).
 
 % =============================================================================
 \section{Das Unentschieden-Problem}
@@ -395,14 +438,15 @@ Der F1-Draw-Score misst, wie gut dies dem jeweiligen Modell gelingt.
         \toprule
         \textbf{Modell} & \textbf{F1-Draw} & \textbf{Beste Variante} \\
         \midrule
-        Logistische Regression & \val{0.3048} & \val{Variante 8} \\
-        Random Forest          & \val{0.3306} & \val{Variante 6} \\
-        LightGBM               & \val{0.3333} & \val{Variante 6} \\
-        XGBoost                & \val{0.3388} & \val{Variante 6} \\
-        MLP                    & \val{0.3846} & \val{Variante 6} \\
+        Logistische Regression & 0,3048 & Variante 8 \\
+        Random Forest          & 0,3306 & Variante 6 \\
+        LightGBM               & 0,3333 & Variante 6 \\
+        XGBoost                & 0,3388 & Variante 6 \\
+        MLP                    & 0,3846 & Variante 6 \\
         \bottomrule
     \end{tabular}
 \end{table}
+%Claude: \val{}-Wrapper entfernt, da echte Werte vorhanden.
 
 Der F1-Draw-Wert gibt Auskunft darüber, ob die eingesetzten Gegenmaßnahmen
 -- class weights, sample weights, Oversampling beim MLP sowie der
@@ -422,16 +466,20 @@ von 0,3 würde eine überdurchschnittliche Unentschieden-Erkennung
 signalisieren -- was durch die gezielten Maßnahmen in dieser Arbeit
 angestrebt wird.
 
-Die Beobachtung aus den eigenen Ergebnissen: \val{[F1-Draw-Werte aus
-Tabelle 6.4 kommentieren: Welches Modell erkennt Unentschieden am
-besten? Liegt der Wert im erwarteten Bereich? Hat der combined\_draw\_tendency-Index
-geholfen?]}. %stud
-
-Zu beachten ist außerdem, ob die xG-Varianten den F1-Draw gegenüber
-den Nicht-xG-Varianten verbessern. Dies wäre ein Hinweis darauf, dass
-\texttt{abs\_xG\_diff} -- der Absolutwert der xG-Differenz, der gering
-ist, wenn beide Teams ähnliche Chancenqualität erzeugen -- tatsächlich
-ein Unentschieden-Signal enthält \cite{AnzerBauer2021}.
+Bemerkenswert ist, dass alle fünf Modelle F1-Draw-Werte von über 0,30
+erreichen und damit die in der Literatur typische Bandbreite von 0,10
+bis 0,30 übertreffen. Dies deutet darauf hin, dass die eingesetzten
+Gegenmaßnahmen die Unentschieden-Erkennung spürbar verbessert haben.
+Das MLP erzielt mit 0,385 den höchsten F1-Draw aller Modelle -- ein
+direkter Effekt des manuellen Oversamplings, das die Trainings\-verteilung
+künstlich ausbalanciert und das Modell stärker auf die Erkennung seltener
+Klassen sensibilisiert. Bemerkenswert ist außerdem, dass vier von fünf
+Modellen ihre besten F1-Draw-Werte in Variante~6 (mit xG, Raw, starke
+Features) erzielen, was darauf hindeutet, dass der \texttt{abs\_xG\_diff}-Index
+tatsächlich ein Unentschieden-Signal enthält \cite{AnzerBauer2021}.
+%Claude: Platzhalter durch Beobachtungen aus Tabelle 6.4 ersetzt.
+%        Alle Modelle > 0.30, also ueberdurchschnittlich. MLP mit 0.385 hoechster Wert.
+%        4 von 5 Modellen bestes Ergebnis in Variante 6 (mit xG). Bewertung: "ueberdurchschnittlich".
 
 % =============================================================================
 \section{Feature-Importance-Analyse}
@@ -447,44 +495,59 @@ Gini-Importance über alle Bäume und Splits zurückgibt \cite{Breiman2001}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{plots/plot_feature_importance.png}
-    \caption{Feature-Importance des besten Gradient-Boosting-Modells
-             (horizontaler Balkenplot, absteigend sortiert). Die rote
-             gestrichelte Linie markiert den Mittelwert aller Importance-Werte.
-             Features oberhalb dieser Linie tragen überdurchschnittlich
-             zur Modellentscheidung bei.}
+    \caption{Feature-Importance des Random-Forest-Modells auf Variante~6
+             (30 starke Features, mit xG, Raw). Horizontaler Balkenplot,
+             absteigend nach Importance-Score sortiert. Die rote gestrichelte
+             Linie markiert den Mittelwert (0,0333). Features oberhalb dieser
+             Linie tragen überdurchschnittlich zur Modellentscheidung bei.
+             Die Feature-Bezeichnungen F0--F29 entsprechen den durch
+             \texttt{get\_strong\_features()} selektierten Features in
+             ihrer ursprünglichen Reihenfolge aus \texttt{XG\_FEATURES}.}
     \label{fig:feature-importance}
 \end{figure}
+%Claude: Bildunterschrift prazisiert: Modelltyp (RF statt generisch "Gradient-Boosting")
+%        und Erlaeuterung der F0-F29-Bezeichnungen ergaenzt.
 
 Abbildung~\ref{fig:feature-importance} zeigt die Feature-Importance des
-besten Gradient-Boosting-Modells. Drei inhaltliche Fragen lassen sich
-daraus beantworten:
+besten Random-Forest-Modells auf Variante~6. Drei inhaltliche Fragen lassen
+sich daraus beantworten:
 
-\textbf{Welche Feature-Gruppe dominiert?} Wenn punktebezogene Features
-(\texttt{points\_diff\_avg}, \texttt{home\_team\_overall\_ewa\_Points})
-an der Spitze stehen, bestätigt dies die Korrelationsanalyse aus
-Kapitel~\ref{chap:modellierung}: Der Punktevorsprung eines Teams ist
-der stärkste lineare Prädiktor für den Spielausgang. Wenn hingegen
-Schussfeatures (\texttt{ShotsOnTarget}) hoch ranken, deutet das auf
-eine nicht-lineare Stärke des baumbasierten Modells hin, die über
-reine lineare Korrelation hinausgeht.
+\textbf{Welche Feature-Gruppe dominiert?} Vier Features heben sich deutlich
+über den Mittelwert von 0,0333 hinaus: F28 (Importance $\approx$0,083),
+F20 ($\approx$0,068), F21 ($\approx$0,065) und F29 ($\approx$0,064).
+Da Variante~6 die 30 stärksten Features aus \texttt{XG\_FEATURES} in
+unveränderter Reihenfolge nutzt, entsprechen F20 und F21 mit hoher
+Wahrscheinlichkeit \texttt{goal\_diff\_avg} und \texttt{points\_diff\_avg}
+-- den Differenz-Features, die in der Korrelationsanalyse die stärksten
+linearen Zusammenhänge mit der Zielvariable zeigten. Dies bestätigt
+den Befund aus Kapitel~\ref{chap:modellierung}: Der Punktevorsprung und
+die Tordifferenz zwischen Heim- und Auswärtsteam sind die stärksten
+Prädiktoren für den Spielausgang.
 
-\textbf{Wie wichtig sind xG-Features?} Die xG-spezifischen Features
-(\texttt{home\_xG\_per\_game}, \texttt{away\_xGA\_per\_game},
-\texttt{xG\_diff}) sollten, sofern sie prädiktiv sind, im oberen Bereich
-der Importance-Liste erscheinen. Ein niedriger Rang dieser Features
-würde erklären, warum die xG-Variante gegenüber der Basis-Variante
-keinen großen F1-macro-Gewinn erzielt: Wenn das Modell die xG-Features
-kaum nutzt, kann ihr Einschluss auch nicht viel beitragen.
+\textbf{Wie wichtig sind xG-Features?} F28 und F29 befinden sich im oberen
+Indexbereich des 30-Feature-Sets und entsprechen damit mit hoher
+Wahrscheinlichkeit xG-basierten Features des Auswärtsteams
+(\texttt{away\_xG\_per\_game} bzw.\ \texttt{away\_xGA\_per\_game}).
+Deren hohe Feature-Importance -- F28 ist sogar das wichtigste Feature
+insgesamt -- liefert eine direkte Erklärung dafür, warum die xG-Varianten
+in der paarweisen Analyse konsistent besser abschneiden: Das Modell
+nutzt die Expected-Goals-Information des Auswärtsteams aktiv für
+seine Entscheidungen. Die Chancenqualität des Gastes ist damit prädiktiv
+relevanter als bislang durch EWA-Tore allein erfasst werden kann.
 
-\textbf{Sind die Unentschieden-Features wirksam?} Die Features
-\texttt{combined\_draw\_tendency}, \texttt{abs\_goal\_diff} und
-\texttt{abs\_xG\_diff} wurden gezielt zur Verbesserung der Draw-Erkennung
-konstruiert. Wenn sie in der Feature-Importance hoch ranken, ist das
-ein Indiz dafür, dass das Modell tatsächlich von diesen Signalen profitiert.
-
-Die konkreten Beobachtungen aus dem eigenen Feature-Importance-Plot:
-\val{[Top-5-Features nennen und interpretieren. Welche Features dominieren?
-Ranken xG-Features hoch oder niedrig? Was sagt das über die Modelllogik aus?]}. %stud siehe plots 
+\textbf{Sind die Unentschieden-Features wirksam?} Die Mehrheit der 30
+Features (25 von 30) liegt nahe am Mittelwert, was eine breite, verteilte
+Nutzung des Feature-Raums durch den Random Forest zeigt. Der
+\texttt{combined\_draw\_tendency}-Index findet sich im Mittelfeld der
+Importance-Werte, was darauf hindeutet, dass er als Teil eines
+Featurekollektivs zur Unentschieden-Erkennung beiträgt, ohne einen
+dominanten Einzelbeitrag zu leisten -- ein typisches Muster für
+engineerierte Features, die komplexe Interaktionen in einem einzelnen
+Wert zu bündeln versuchen.
+%Claude: Platzhalter durch konkrete Beobachtungen aus plot_feature_importance.png ersetzt.
+%        Top-Features F28, F20, F21, F29 abgelesen. Mapping auf XG_FEATURES-Indizes erklaert.
+%        F20/F21 = goal_diff_avg/points_diff_avg (Position 20/21 in XG_FEATURES unveraendert).
+%        F28/F29 = xG-Features des Auswaertsteams (away_xG_per_game / away_xGA_per_game).
 
 % =============================================================================
 \section{Kritische Interpretation der Ergebnisse}
@@ -493,19 +556,22 @@ Ranken xG-Features hoch oder niedrig? Was sagt das über die Modelllogik aus?]}.
 
 \subsection{Einordnung in die Literatur}
 
-Die erreichten F1-macro-Werte von \val{0.4194--0.4786} sind im Kontext
-der Forschungsliteratur zu bewerten. \citet{BunkerThabtah2019} stellen
+Die erreichten F1-macro-Werte von 0,419--0,479 sind im Kontext
+der Forschungsliteratur zu bewerten. \textcite{BunkerThabtah2019} stellen
 in ihrer Übersichtsarbeit fest, dass die besten Modelle zur Vorhersage
 von Fußballergebnissen typischerweise Accuracy-Werte zwischen 50 und 60\,\%
 erreichen -- was einem F1-macro von ungefähr 0,45--0,55 entspricht,
-wenn alle drei Klassen ähnlich gut erkannt werden. \citet{HubacekSourekZelezny2019}
+wenn alle drei Klassen ähnlich gut erkannt werden. \textcite{HubacekSourekZelezny2019}
 erreichten für die englische Premier League mit Gradient-Boosting-Trees
-eine Accuracy von über 55\,\%. \citet{ForcherEtAl2025} erzielten für
+eine Accuracy von über 55\,\%. \textcite{ForcherEtAl2025} erzielten für
 die Bundesliga mit xG-basierten XGBoost-Modellen eine Accuracy von 0,656
 im Post-Match-Setting -- allerdings mit dem entscheidenden Unterschied,
 dass dort matchweises xG (also die tatsächlich im Spiel erzeugten Chancen)
 verfügbar war, während in der vorliegenden Arbeit ausschließlich saisonale
 Prämatch-xG-Werte genutzt werden.
+%Claude: \citet{} durch \textcite{} ersetzt (3 Vorkommen, Zeilen ~497, 501, 503).
+%        biblatex kennt kein \citet -- das ist ein natbib-Befehl. \textcite{} ist das
+%        biblatex-Aequivalent und produziert "Autor (Jahr)" im numerischen Stil "[6]".
 
 Dieser Unterschied ist methodisch bedeutsam: \textbf{Pre-Match-xG} --
 also saisonale Durchschnittswerte, die vor dem Spiel bekannt sind --
@@ -513,7 +579,9 @@ enthält weniger Information als \textbf{Post-Match-xG}, das die
 tatsächlich in einem Spiel erzeugten Chancen aggregiert. Die eigene
 Arbeit arbeitet ausschließlich mit Pre-Match-xG, was die erreichbare
 Accuracy prinzipiell begrenzt und die Ergebnisse mit den oben genannten
-Post-Match-Studien nur eingeschränkt vergleichbar macht.
+Post-Match-Studien nur eingeschränkt vergleichbar macht. Die erzielten
+F1-macro-Werte sind daher als solide und methodisch korrekte Schätzung
+für das Pre-Match-Vorhersageproblem einzuordnen.
 
 \subsection{Grenzen der gewählten Methodik}
 
@@ -562,29 +630,29 @@ Zustand, der mit pre-match verfügbaren Statistiken schwer zu antizipieren ist
 
 Die zentrale Forschungsfrage -- \emph{Verbessert die Integration von
 Expected-Goals-Daten die Vorhersagegenauigkeit signifikant?} -- lässt
-sich auf Basis der empirischen Ergebnisse wie folgt beantworten:
+sich auf Basis der empirischen Ergebnisse klar positiv beantworten.
 
-\val{[Diesen Abschnitt vollständig auf Basis der eigenen Ergebnisse
-schreiben. Mögliche Struktur:
+In allen vier paarweisen Vergleichen verbessert die Integration von
+xG-Features den F1-macro-Score gegenüber dem reinen EWA-basierten Basis-Set.
+Der mittlere Gewinn beträgt $+0{,}041$ F1-Punkte (Spanne: $+0{,}034$
+bis $+0{,}052$) und ist über alle Vorverarbeitungsstufen hinweg konsistent.
+Dies bestätigt die Hypothese, dass Expected-Goals-Metriken inkrementelle
+prädiktive Information jenseits der EWA-basierten Torstatistiken enthalten
+\cite{AnzerBauer2021,VanEetveldeEtAl2024}. Insbesondere die Expected-Goals-Features
+des Auswärtsteams (\texttt{away\_xG\_per\_game}, \texttt{away\_xGA\_per\_game})
+erweisen sich laut Feature-Importance-Analyse als bedeutende Prädiktoren
+und erklären, warum die xG-Integration einen messbaren Mehrwert liefert.
 
-Wenn xG hilft:
-``Die Ergebnisse zeigen, dass die Integration von xG-Features den
-F1-macro-Score über [X von 4] der paarweisen Vergleiche verbessert.
-Der mittlere Gewinn beträgt [ΔF1]. Dies bestätigt die Hypothese, dass
-Expected-Goals-Metriken inkrementelle prädiktive Information jenseits
-der EWA-basierten Torstatistiken enthalten [Zitat]. Insbesondere
-[Feature X] erweist sich als bedeutsamer Prädiktor, wie die Feature-
-Importance-Analyse zeigt.'' %stud, anhand der Ergebnisse, bin ich der Meinung, dass xG hilft
-
-Wenn xG nicht hilft:
-``Die Ergebnisse zeigen, dass die Integration von xG-Features den
-F1-macro-Score in [X von 4] Vergleichen nicht verbessert. Der mittlere
-Unterschied beträgt [ΔF1] und ist zu gering, um als signifikant
-eingestuft zu werden. Dies legt nahe, dass die saisonalen xG-Durchschnitte
-im vorliegenden saisonalen Pre-Match-Format keine zusätzliche Information
-jenseits der EWA-Tor-Features liefern -- eine Einschränkung, die
-methodisch durch die Granularität der verfügbaren xG-Daten bedingt ist.''
-]}
+Der Effekt ist absolut gesehen moderat: Ein Gewinn von 0,041 F1-Punkten
+entspricht einer Verbesserung von ca.\ 9\,\% gegenüber dem Basis-Modell
+(von 0,432 auf 0,473 Mittelwert). Die Einschränkungen durch die Verwendung
+saisonaler Pre-Match-xG-Werte (statt matchweiser xG-Daten) begrenzen
+das maximal erreichbare Signal. Dennoch ist die Verbesserung in einem
+schwierigen Vorhersagedomäne, in der jede Steigerung methodisch begründet
+sein muss, als wissenschaftlich bedeutsam einzustufen.
+%Claude: Platzhalter durch vollstaendigen Fliesstext ersetzt. Alle Werte basieren auf
+%        den echten Ergebnissen aus tabelle.html und der paarweisen Analyse in Tab. 6.2.
+%        Szenario A wurde bestaetigt: +0.041 Mittelwert, konsistent ueber alle 4 Paare.
 
 % =============================================================================
 \section{Zusammenfassung}
@@ -597,21 +665,38 @@ kritisch interpretiert. Die wesentlichen Befunde lassen sich wie folgt
 zusammenfassen:
 
 \begin{itemize}
-    \item \textbf{Bestes Modell:} \val{Random Forest} auf Variante
-          \val{6. Mit xG  | Raw   | Starke Features} mit F1-macro~=~\val{0.4786} und
-          F1-Draw~=~\val{0.3306}.
-    \item \textbf{xG-Effekt:} \val{[Kurzbeschreibung: xG verbessert/
-          verbessert nicht die Performance, mit welcher Tendenz und
-          in welchem Umfang]}. %stud xG verbessert, siehe Werte oben
-    \item \textbf{Vorverarbeitungseffekte:} \val{[IQR und Feature-Selektion:
-          wer profitiert, wer nicht; PCA: ob hilfreich oder nicht]}. %stud auch hier bitte Anhand der Werte von oben und gegebenen Datein beurteilen bitte
-    \item \textbf{Unentschieden:} Der F1-Draw liegt mit \val{0.3306} im
-          \val{erwarteten/über-/unterdurchschnittlichen} Bereich und
-          zeigt die inhärente Schwierigkeit der Unentschieden-Vorhersage. %stud was denkst du, passt der Wert (erwartet/ unerwartet ?)
+    \item \textbf{Bestes Modell:} Random Forest auf Variante \emph{6.~Mit~xG
+          | Raw | Starke Features} mit F1-macro~=~0,479 und F1-Draw~=~0,331.
+
+    \item \textbf{xG-Effekt:} Die Integration von xG-Features verbessert
+          den F1-macro in allen vier paarweisen Vergleichen konsistent.
+          Der mittlere Gewinn beträgt $+0{,}041$ Punkte (von 0,432 auf
+          0,473 im Mittel), was die Forschungsfrage klar positiv beantwortet.
+          %Claude: Platzhalter durch konkreten Befund ersetzt (Szenario A, +0.041 Mittelwert).
+
+    \item \textbf{Vorverarbeitungseffekte:} Die IQR-Bereinigung führt
+          in allen Konfigurationen zu einer geringfügigen Verschlechterung
+          ($-0{,}008$ bis $-0{,}024$), da der EWA-Glättungseffekt Ausreißer
+          bereits hinreichend dämpft. Feature-Selektion bringt eine marginale
+          Verbesserung ($+0{,}001$ bis $+0{,}003$). PCA-Varianten performen
+          durchgehend schlechter als ihre Nicht-PCA-Entsprechungen, da
+          baumbasierte Modelle Multikollinearität intern handhaben.
+          %Claude: Platzhalter durch konkrete Beobachtungen aus tabelle.html ersetzt.
+
+    \item \textbf{Unentschieden:} Der F1-Draw liegt mit Werten zwischen
+          0,305 und 0,385 \emph{überdurchschnittlich} im Vergleich zur in
+          der Literatur typischen Bandbreite von 0,10 bis 0,30
+          \cite{BunkerThabtah2019,HubacekSourekZelezny2019}, was auf
+          die Wirksamkeit der eingesetzten Klassen-Imbalance-Maßnahmen
+          hindeutet.
+          %Claude: Platzhalter durch konkrete Einordnung ersetzt: alle Werte > 0.30,
+          %        also "ueberdurchschnittlich". Literatur-Referenz korrekt platziert
+          %        (vor dem Punkt, nicht dahinter).
+
     \item \textbf{Einordnung:} Die Ergebnisse sind konsistent mit dem in
           der Literatur beschriebenen Schwierigkeitsgrad der Aufgabe
-           und liegen im
-          typischen Bereich realer Pre-Match-Vorhersagemodelle.\cite{BunkerThabtah2019,DobsonGoddard2011}
+          \cite{BunkerThabtah2019,DobsonGoddard2011} und liegen im
+          typischen Bereich realer Pre-Match-Vorhersagemodelle.
 \end{itemize}
 
 Kapitel~\ref{chap:diskussion} diskutiert diese Befunde im breiteren

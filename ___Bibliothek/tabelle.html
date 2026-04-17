@@ -1,0 +1,334 @@
+<div>
+  <style scoped>
+    .dataframe tbody tr th:only-of-type {
+      vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+      vertical-align: top;
+    }
+
+    .dataframe thead th {
+      text-align: right;
+    }
+  </style>
+  <table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th>
+        <th>Variante</th>
+        <th>Datenpunkte</th>
+        <th># Features</th>
+        <th>LogReg F1</th>
+        <th>LogReg F1-Draw</th>
+        <th>LogReg Acc</th>
+        <th>LogReg CV F1</th>
+        <th>RF F1</th>
+        <th>RF F1-Draw</th>
+        <th>RF Acc</th>
+        <th>...</th>
+        <th>LGBM Acc</th>
+        <th>LGBM CV F1</th>
+        <th>XGBoost F1</th>
+        <th>XGBoost F1-Draw</th>
+        <th>XGBoost Acc</th>
+        <th>XGBoost CV F1</th>
+        <th>MLP F1</th>
+        <th>MLP F1-Draw</th>
+        <th>MLP Acc</th>
+        <th>MLP CV F1</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>5</th>
+        <td>6. Mit xG | Raw | Starke Features</td>
+        <td>2294</td>
+        <td>30</td>
+        <td>0.459367</td>
+        <td>0.311688</td>
+        <td>0.483660</td>
+        <td>0.450538</td>
+        <td>0.478585</td>
+        <td>0.330579</td>
+        <td>0.498911</td>
+        <td>...</td>
+        <td>0.492375</td>
+        <td>0.427162</td>
+        <td>0.472545</td>
+        <td>0.338843</td>
+        <td>0.490196</td>
+        <td>0.453222</td>
+        <td>0.461409</td>
+        <td>0.384615</td>
+        <td>0.474946</td>
+        <td>0.628340</td>
+      </tr>
+      <tr>
+        <th>4</th>
+        <td>5. Mit xG | Raw | Alle Features</td>
+        <td>2294</td>
+        <td>34</td>
+        <td>0.455098</td>
+        <td>0.310924</td>
+        <td>0.474946</td>
+        <td>0.449148</td>
+        <td>0.476056</td>
+        <td>0.330579</td>
+        <td>0.496732</td>
+        <td>...</td>
+        <td>0.446623</td>
+        <td>0.427638</td>
+        <td>0.469327</td>
+        <td>0.324786</td>
+        <td>0.490196</td>
+        <td>0.443196</td>
+        <td>0.444822</td>
+        <td>0.351254</td>
+        <td>0.457516</td>
+        <td>0.631424</td>
+      </tr>
+      <tr>
+        <th>7</th>
+        <td>8. Mit xG | Clean | Starke Features</td>
+        <td>2278</td>
+        <td>30</td>
+        <td>0.464631</td>
+        <td>0.304762</td>
+        <td>0.491228</td>
+        <td>0.451341</td>
+        <td>0.470851</td>
+        <td>0.355932</td>
+        <td>0.486842</td>
+        <td>...</td>
+        <td>0.453947</td>
+        <td>0.433581</td>
+        <td>0.456081</td>
+        <td>0.293333</td>
+        <td>0.480263</td>
+        <td>0.444929</td>
+        <td>0.403100</td>
+        <td>0.252336</td>
+        <td>0.436404</td>
+        <td>0.631588</td>
+      </tr>
+      <tr>
+        <th>6</th>
+        <td>7. Mit xG | Clean | Alle Features</td>
+        <td>2278</td>
+        <td>34</td>
+        <td>0.456003</td>
+        <td>0.284360</td>
+        <td>0.484649</td>
+        <td>0.449107</td>
+        <td>0.466331</td>
+        <td>0.316239</td>
+        <td>0.486842</td>
+        <td>...</td>
+        <td>0.458333</td>
+        <td>0.438281</td>
+        <td>0.453647</td>
+        <td>0.296943</td>
+        <td>0.475877</td>
+        <td>0.445329</td>
+        <td>0.400668</td>
+        <td>0.220096</td>
+        <td>0.442982</td>
+        <td>0.649724</td>
+      </tr>
+      <tr>
+        <th>10</th>
+        <td>11. Mit xG | Raw | PCA (Basis V6)</td>
+        <td>2294</td>
+        <td>14</td>
+        <td>0.457184</td>
+        <td>0.285714</td>
+        <td>0.485839</td>
+        <td>0.447650</td>
+        <td>0.448978</td>
+        <td>0.321569</td>
+        <td>0.461874</td>
+        <td>...</td>
+        <td>0.457516</td>
+        <td>0.438683</td>
+        <td>0.451516</td>
+        <td>0.322314</td>
+        <td>0.468410</td>
+        <td>0.443295</td>
+        <td>0.405312</td>
+        <td>0.293878</td>
+        <td>0.416122</td>
+        <td>0.640370</td>
+      </tr>
+      <tr>
+        <th>11</th>
+        <td>12. Mit xG | Clean | PCA (Basis V8)</td>
+        <td>2278</td>
+        <td>14</td>
+        <td>0.440297</td>
+        <td>0.242718</td>
+        <td>0.475877</td>
+        <td>0.451024</td>
+        <td>0.435685</td>
+        <td>0.241546</td>
+        <td>0.467105</td>
+        <td>...</td>
+        <td>0.484649</td>
+        <td>0.440174</td>
+        <td>0.448482</td>
+        <td>0.303030</td>
+        <td>0.469298</td>
+        <td>0.441757</td>
+        <td>0.399223</td>
+        <td>0.268519</td>
+        <td>0.432018</td>
+        <td>0.634477</td>
+      </tr>
+      <tr>
+        <th>0</th>
+        <td>1. Ohne xG | Raw | Alle Features</td>
+        <td>2973</td>
+        <td>25</td>
+        <td>0.418432</td>
+        <td>0.216561</td>
+        <td>0.440336</td>
+        <td>0.447928</td>
+        <td>0.442293</td>
+        <td>0.283988</td>
+        <td>0.455462</td>
+        <td>...</td>
+        <td>0.448739</td>
+        <td>0.437215</td>
+        <td>0.441519</td>
+        <td>0.284024</td>
+        <td>0.453782</td>
+        <td>0.449339</td>
+        <td>0.373288</td>
+        <td>0.241135</td>
+        <td>0.413445</td>
+        <td>0.619205</td>
+      </tr>
+      <tr>
+        <th>1</th>
+        <td>2. Ohne xG | Raw | Starke Features</td>
+        <td>2973</td>
+        <td>22</td>
+        <td>0.430980</td>
+        <td>0.227273</td>
+        <td>0.455462</td>
+        <td>0.442888</td>
+        <td>0.443052</td>
+        <td>0.283988</td>
+        <td>0.457143</td>
+        <td>...</td>
+        <td>0.442017</td>
+        <td>0.436963</td>
+        <td>0.434428</td>
+        <td>0.261905</td>
+        <td>0.448739</td>
+        <td>0.445980</td>
+        <td>0.334278</td>
+        <td>0.224490</td>
+        <td>0.352941</td>
+        <td>0.607831</td>
+      </tr>
+      <tr>
+        <th>9</th>
+        <td>10. Ohne xG | Clean | PCA (Basis V4)</td>
+        <td>2943</td>
+        <td>11</td>
+        <td>0.428546</td>
+        <td>0.276596</td>
+        <td>0.451613</td>
+        <td>0.449583</td>
+        <td>0.433395</td>
+        <td>0.281588</td>
+        <td>0.458404</td>
+        <td>...</td>
+        <td>0.438031</td>
+        <td>0.426930</td>
+        <td>0.428051</td>
+        <td>0.280576</td>
+        <td>0.451613</td>
+        <td>0.451832</td>
+        <td>0.379974</td>
+        <td>0.222222</td>
+        <td>0.410866</td>
+        <td>0.592730</td>
+      </tr>
+      <tr>
+        <th>8</th>
+        <td>9. Ohne xG | Raw | PCA (Basis V2)</td>
+        <td>2973</td>
+        <td>11</td>
+        <td>0.430138</td>
+        <td>0.237179</td>
+        <td>0.452101</td>
+        <td>0.446260</td>
+        <td>0.440190</td>
+        <td>0.282051</td>
+        <td>0.458824</td>
+        <td>...</td>
+        <td>0.443697</td>
+        <td>0.436508</td>
+        <td>0.427122</td>
+        <td>0.251572</td>
+        <td>0.445378</td>
+        <td>0.444840</td>
+        <td>0.378069</td>
+        <td>0.276094</td>
+        <td>0.406723</td>
+        <td>0.633684</td>
+      </tr>
+      <tr>
+        <th>3</th>
+        <td>4. Ohne xG | Clean | Starke Features</td>
+        <td>2943</td>
+        <td>22</td>
+        <td>0.430820</td>
+        <td>0.273381</td>
+        <td>0.455008</td>
+        <td>0.457846</td>
+        <td>0.419396</td>
+        <td>0.279070</td>
+        <td>0.438031</td>
+        <td>...</td>
+        <td>0.438031</td>
+        <td>0.431965</td>
+        <td>0.405883</td>
+        <td>0.249158</td>
+        <td>0.426146</td>
+        <td>0.448701</td>
+        <td>0.399641</td>
+        <td>0.231047</td>
+        <td>0.432937</td>
+        <td>0.628295</td>
+      </tr>
+      <tr>
+        <th>2</th>
+        <td>3. Ohne xG | Clean | Alle Features</td>
+        <td>2943</td>
+        <td>25</td>
+        <td>0.408271</td>
+        <td>0.246479</td>
+        <td>0.431239</td>
+        <td>0.456837</td>
+        <td>0.422323</td>
+        <td>0.272425</td>
+        <td>0.441426</td>
+        <td>...</td>
+        <td>0.432937</td>
+        <td>0.430295</td>
+        <td>0.398760</td>
+        <td>0.232082</td>
+        <td>0.421053</td>
+        <td>0.450419</td>
+        <td>0.392246</td>
+        <td>0.300000</td>
+        <td>0.414261</td>
+        <td>0.612677</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>12 rows × 23 columns</p>
+</div>
