@@ -1,0 +1,105 @@
+% =============================================================================
+% KAPITEL 8: FAZIT UND AUSBLICK
+% =============================================================================
+
+\chapter{Fazit und Ausblick}\label{chap:fazit}
+
+% =============================================================================
+\section{Fazit}
+\label{sec:fazit}
+% =============================================================================
+
+Diese Arbeit hat untersucht, ob und in welchem Umfang die Integration von
+Expected-Goals-Daten (xG) die Vorhersagegenauigkeit von Machine-Learning-Modellen
+für Bundesliga-Spielergebnisse verbessert. Ausgangspunkt war die Beobachtung,
+dass traditionelle Spielstatistiken -- Tore, Schüsse, Punkte -- zufallsbedingte
+Schwankungen nicht herausrechnen, während xG die Qualität von Torchancen
+unabhängig vom tatsächlichen Torerfolg misst und damit einen stabileren
+Leistungsindikator darstellt \cite{AnzerBauer2021,Wheatcroft2022}.
+
+\textbf{Zur zentralen Forschungsfrage:} \emph{Verbessert die Integration
+von Expected-Goals-Daten die Vorhersagegenauigkeit signifikant?}
+
+Die Antwort ist \textbf{ja} -- mit der wichtigen methodischen Einschränkung,
+dass der Effekt moderat, aber konsistent ist. In allen vier paarweisen
+Vergleichen zwischen xG- und Nicht-xG-Varianten zeigt die xG-Integration
+eine Verbesserung des F1-macro-Scores, mit einem mittleren Gewinn von
+$+0{,}041$ Punkten (von durchschnittlich 0,432 auf 0,473). Dieser Befund
+ist robust: Er tritt unabhängig davon auf, ob der Datensatz bereinigt,
+feature-selektiert oder unverändert verwendet wird. Insbesondere die
+Expected-Goals-Daten des Auswärtsteams erweisen sich laut
+Feature-Importance-Analyse als bedeutende Prädiktoren, was darauf hindeutet,
+dass xG-Metriken Information kodieren, die durch die EWA-basierten
+Torfeatures allein nicht vollständig erfasst wird.
+
+Das beste Einzelmodell -- ein Random Forest auf Variante~6 (\emph{Mit xG,
+Raw, Starke Features}) -- erreicht einen F1-macro von 0,479 und eine
+Accuracy von 0,499. Diese Werte liegen im unteren Bereich des in der
+Literatur für Pre-Match-Vorhersagen beschriebenen realistischen Korridors
+von 0,45--0,55 \cite{BunkerThabtah2019,HubacekSourekZelezny2019} und sind
+damit als methodisch solide, aber nicht ungewöhnlich einzuordnen. Der
+erhebliche Abstand zu Post-Match-Modellen -- die mit matchweisem xG
+Accuracies von über 65\,\% erzielen \cite{ForcherEtAl2025} -- erklärt sich
+aus dem grundlegend anderen Informationsstand: Pre-Match-Vorhersagen müssen
+ohne Kenntnis des Spielverlaufs auskommen.
+
+Neben der Beantwortung der Forschungsfrage liefert die Arbeit drei
+methodische Beiträge: Erstens eine vollständige, reproduzierbare
+ML-Pipeline zur Bundesliga-Spielvorhersage mit konsequenter Data-Leakage-Prävention
+durch den Lag-1-Ansatz und die Shift-Operation bei der EWA-Berechnung.
+Zweitens den Nachweis, dass gezielt konstruierte Unentschieden-Features
+(\texttt{combined\_draw\_tendency}, \texttt{abs\_xG\_diff}) in Verbindung
+mit gewichtetem Training zu überdurchschnittlichen F1-Draw-Werten von
+0,305 bis 0,385 führen -- einem in der Literatur typischerweise
+schwierig zu erreichenden Ergebnis \cite{HeGarcia2009}. Drittens eine
+systematische Evaluation von zwölf Datensatzvarianten, die zeigt, dass
+PCA bei baumbasierten Modellen keinen Mehrwert bietet und IQR-Bereinigung
+bei EWA-geglätteten Features überflüssig ist.
+
+% =============================================================================
+\section{Ausblick}
+\label{sec:ausblick}
+% =============================================================================
+
+Die Ergebnisse dieser Arbeit öffnen mehrere Richtungen für zukünftige
+Forschung:
+
+\textbf{Matchweises xG:} Der deutlichste Hebel zur Verbesserung der
+Vorhersagegüte liegt in der Verwendung spielphasenweiser xG-Daten.
+Wenn für jedes Spiel der aktuelle xG-Durchschnitt der letzten $n$ Partien
+bekannt ist -- analog zur EWA-Berechnung für Tore -- würde die xG-Information
+denselben Formcharakter erhalten wie die übrigen Features. Anbieter wie
+Statsbomb oder Wyscout stellen solche Daten kommerziell zur Verfügung;
+im akademischen Bereich könnten öffentliche Tracking-Datensätze genutzt
+werden \cite{PappalardoEtAl2019}.
+
+\textbf{Temporal-konsistentes Evaluationsdesign:} Eine Aufteilung nach
+Saisons -- Training auf 2016/17--2022/23, Validierung auf 2023/24,
+Test auf 2024/25--2025/26 -- würde die zeitliche Kausalität sicherstellen
+und die Übertragbarkeit der Modelle auf reale Prognoseszenarien besser
+abbilden.
+
+\textbf{Erweiterung des Feature-Sets:} Weitere Einflussfaktoren wie
+Marktwerte der Kader \cite{RibeiroEtAl2025}, Reisedistanz vor Auswärtsspielen
+oder die Anzahl der Tage seit dem letzten Spiel (Müdigkeitseffekt) könnten
+das Modell um Kontextinformationen ergänzen, die im aktuellen Feature-Set
+fehlen.
+
+\textbf{Ensemble-Kombinationen:} Die geringen Leistungsunterschiede zwischen
+Random Forest, LightGBM und XGBoost legen nahe, dass ein Voting-Ensemble
+aus allen drei Modellen -- wie von \textcite{MillsEtAl2024} für ähnliche
+Aufgaben gezeigt -- die Generalisierungsleistung weiter stabilisieren könnte.
+
+\textbf{Erweiterte Ligazusammensetzung:} Die Übertragbarkeit der Befunde
+auf andere Ligen -- insbesondere solche mit abweichenden Torquoten oder
+anderen Heimvorteils-Charakteristika -- wäre eine naheliegende Erweiterung,
+die die Generalisierbarkeit des Ansatzes validiert.
+
+Zusammenfassend zeigt diese Arbeit, dass Expected Goals auch in einem
+saisonalen Pre-Match-Format einen messbaren und konsistenten prädiktiven
+Beitrag leisten. Gleichzeitig verdeutlicht sie, wo die fundamentalen
+Grenzen der Vorhersagbarkeit von Fußballergebnissen liegen: nicht
+primär im Modell, sondern in der Natur des Spiels selbst -- einem
+Low-Scoring-Sport, in dem Zufall und nicht beobachtbare Faktoren
+zwangsläufig einen erheblichen Anteil der Ergebnisvarianz erklären
+\cite{DobsonGoddard2011,Sumpter2016}.

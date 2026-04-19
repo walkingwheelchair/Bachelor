@@ -1,0 +1,187 @@
+% =============================================================================
+% KAPITEL 7: DISKUSSION DER ERGEBNISSE (INKL. LIMITATIONEN)
+% =============================================================================
+
+\chapter{Diskussion der Ergebnisse}\label{chap:diskussion}
+
+Dieses Kapitel ordnet die in Kapitel~\ref{chap:evaluation} präsentierten
+Befunde in den wissenschaftlichen Kontext ein, diskutiert ihre Tragweite
+und benennt die Grenzen der gewählten Methodik. Abschnitt~\ref{sec:disk-befunde}
+diskutiert die zentralen inhaltlichen Befunde. Abschnitt~\ref{sec:disk-limitationen}
+benennt die methodischen Limitationen der Arbeit. Abschnitt~\ref{sec:disk-zusammenfassung}
+schließt mit einer Gesamtbewertung.
+
+% =============================================================================
+\section{Diskussion der zentralen Befunde}
+\label{sec:disk-befunde}
+% =============================================================================
+
+\subsection{xG als prädiktiver Mehrwert -- Konsistenz und Grenzen}
+
+Der wichtigste Befund dieser Arbeit ist, dass die Integration von
+Expected-Goals-Daten den F1-macro-Score in allen vier paarweisen Vergleichen
+verbessert. Der mittlere Gewinn von $+0{,}041$ F1-Punkten ist moderat,
+aber konsistent -- und genau diese Konsistenz ist wissenschaftlich
+belastbarer als ein einzelner hoher Ausreißer in einer Konfiguration.
+Die Ergebnisse stehen im Einklang mit \textcite{AnzerBauer2021} und
+\textcite{VanEetveldeEtAl2024}, die xG als stabilen Teamleistungsindikator
+identifiziert haben.
+
+Einschränkend ist jedoch festzuhalten, dass die verwendeten xG-Werte
+\emph{saisonale Durchschnitte pro Spiel} sind -- also ein einziger
+statischer Wert für alle Spiele eines Teams in einer gesamten Saison.
+\textcite{ForcherEtAl2025} haben für die Bundesliga gezeigt, dass
+matchweises Post-Match-xG eine Accuracy von 0,656 ermöglicht. Der in
+dieser Arbeit erzielte Accuracy-Wert von 0,499 liegt deutlich darunter
+-- was primär auf den gröberen Zeitmaßstab der Pre-Match-xG-Daten
+zurückzuführen ist. Der prädiktive Mehrwert von xG wäre vermutlich
+größer, wenn matchweise oder spielphasenweise xG-Daten verfügbar wären
+\cite{Wheatcroft2022}. Das Modell nutzt damit nicht das volle Potential
+des xG-Konzepts, sondern nur einen saisonalen Proxy -- der dennoch
+einen messbaren Informationsgewinn liefert.
+
+\subsection{Random Forest als bestes Modell -- eine überraschende Erkenntnis}
+
+Entgegen der in der Literatur häufig beschriebenen Überlegenheit von
+Gradient-Boosting-Verfahren bei tabellarischen Daten \cite{ChenGuestrin2016,KeEtAl2017}
+erzielt in dieser Arbeit der Random Forest (F1-macro 0,479) den besten
+Wert, gefolgt von LightGBM und XGBoost (je 0,473). Dieser Befund ist
+plausibel erklärbar: Gradient Boosting profitiert typischerweise von
+größeren Datensätzen, bei denen die sequenzielle Residuenkorrektur über
+viele Iterationen hinweg ihre volle Wirkung entfalten kann. Mit
+$\sim$2.300 Trainingsbeispielen in der besten xG-Variante ist die
+Datenmenge begrenzt, was das Bagging-Prinzip des Random Forest -- das
+Rauschen durch Mittelung vieler unabhängig trainierter Bäume reduziert
+-- begünstigt. Dieses Ergebnis reiht sich in Beobachtungen ein, die
+zeigen, dass auf kleinen Datensätzen Ensemble-Methoden unterschiedlicher
+Art vergleichbar performen und keine pauschale Überlegenheit eines
+einzelnen Verfahrens existiert \cite{BunkerThabtah2019}.
+
+\subsection{Unentschieden-Erkennung -- Fortschritt und verbleibende Grenzen}
+
+Alle fünf Modelle erreichen F1-Draw-Werte zwischen 0,305 und 0,385 und
+übertreffen damit die in der Literatur für dieses Problem typische
+Bandbreite von 0,10--0,30 \cite{BunkerThabtah2019,HubacekSourekZelezny2019}.
+Dies zeigt, dass die eingesetzten Gegenmaßnahmen -- klassengewichtetes
+Training und manuelles Oversampling beim MLP -- ihre beabsichtigte
+Wirkung entfaltet haben. Der gezielt konstruierte
+\texttt{combined\_draw\_tendency}-Index trägt ebenfalls zur
+Unentschieden-Erkennung bei, ohne jedoch als einzelnes dominantes
+Feature hervorzustechen.
+
+Dennoch bleibt der F1-Draw mit 0,331 beim Random Forest deutlich hinter
+dem F1-Heimsieg zurück. Dies ist kein Versagen der Modellierung, sondern
+spiegelt eine fundamentale epistemische Grenze wider: Unentschieden
+entstehen in Spielen, in denen beide Teams annähernd gleich stark sind
+-- eine Ausgangslage, die mit pre-match aggregierten Formdaten nur
+unzureichend zu quantifizieren ist, da in solchen Partien kleinste
+zufällige Ereignisse den Ausschlag geben \cite{DobsonGoddard2011,Sumpter2016}.
+
+% =============================================================================
+\section{Limitationen der Arbeit}
+\label{sec:disk-limitationen}
+% =============================================================================
+
+\subsection{Fehlende Einflussvariablen}
+
+Selbst das beste entwickelte Modell erfasst nur einen Bruchteil der
+spielrelevanten Informationen. Folgende Faktoren sind in den Daten
+nicht enthalten, beeinflussen Spielergebnisse aber nachweislich:
+
+\begin{itemize}
+    \item \textbf{Verletzungen und Kaderabsenzen:} Der Ausfall von
+          Schlüsselspielern kann den Erwartungswert eines Spiels erheblich
+          verschieben \cite{DobsonGoddard2011}. EWA-Features mitteln
+          über Perioden mit und ohne diese Informationen hinweg.
+    \item \textbf{Rote Karten und Spielunterbrechungen:} Solche Ereignisse
+          verändern den Spielverlauf fundamental und können nicht antizipiert
+          werden, da sie stochastisch auftreten.
+    \item \textbf{Trainerwechsel und taktische Umstellungen:} Nach einem
+          Trainerwechsel können EWA-Formwerte systematisch falsche Signale
+          senden, da sie auf dem früheren Spielstil basieren.
+    \item \textbf{Motivation und Kontextfaktoren:} Ein Team, das bereits
+          den Abstieg besiegelt hat, verhält sich anders als ein Team im
+          Titelkampf -- eine Information, die keiner der verwendeten
+          Features kodiert.
+\end{itemize}
+
+Diese fehlenden Variablen sind Teil des in Kapitel~\ref{chap:grundlagen}
+beschriebenen irreduziblen Fehlers $\sigma^2$: Sie erhöhen die prinzipielle
+Unvorhersehbarkeit von Fußballergebnissen und begrenzen die erreichbare
+Modellgüte unabhängig vom eingesetzten Algorithmus \cite{GemanEtAl1992}.
+
+\subsection{Granularität und Aktualität der xG-Daten}
+
+Die von \textcite{Understat2024} bezogenen xG-Daten sind saisonale
+Aggregatwerte: Für jedes Team gibt es pro Saison genau einen xG-Wert
+pro Spiel, der für alle 34 Saisonspiele identisch ist. Damit fehlt
+die zeitliche Dynamik innerhalb einer Saison vollständig. Das Lag-1-Design
+-- Vorsaison-xG als Prior für die aktuelle Saison -- ist methodisch
+korrekt und verhindert Data Leakage \cite{KaufmanRossetPerlich2012},
+bedeutet aber auch, dass die xG-Werte immer mindestens eine Saison
+\emph{veraltet} sind, wenn sie in die Vorhersage einfließen. Ein Team
+wie Bayer Leverkusen, das nach einem starken xG-Jahr in der Folgesaison
+die Kaderqualität massiv verändert, wird durch den Lag-1-Prior falsch
+eingeschätzt.
+
+\subsection{Zeitliche Validität des Datensplits}
+
+Der stratifizierte 80:20-Split teilt den Datensatz zufällig auf, ohne
+die zeitliche Struktur der Daten zu berücksichtigen. In der Praxis
+würde ein Vorhersagemodell ausschließlich auf vergangenen Spielen
+trainiert und auf zukünftigen Spielen getestet. Der hier gewählte
+zufällige Split erlaubt es theoretisch, dass Trainingsdaten aus der
+Saison 2024/25 zur Vorhersage von Spielen aus der Saison 2018/19
+genutzt werden -- eine zeitliche Inkonsistenz, die in realen
+Anwendungsszenarien nicht möglich wäre. Eine temporal-konsistente
+Aufteilung (z.\,B.\ Training auf 2016/17--2022/23, Test auf 2023/24
+bis 2025/26) würde die Realitätsnähe des Evaluationsdesigns verbessern,
+birgt jedoch das Risiko kleinerer und weniger repräsentativer Testsets.
+
+\subsection{Eingeschränkte Hyperparameter-Optimierung}
+
+Die Randomized Search mit 10--20 Iterationen je Modell ist eine
+pragmatische Annäherung an die Hyperparameter-Optimierung. Bei einem
+Suchraum von mehreren tausend Kombinationen pro Algorithmus besteht
+die Möglichkeit, dass deutlich bessere Konfigurationen in den
+durchgeführten Iterationen nicht gezogen wurden. Die beobachtete
+CV-Stabilität des Random-Forest-Modells mit einer Standardabweichung
+von $\pm$0,014 ist allerdings ein Indiz dafür, dass die Performance
+nicht stark hyperparameter-sensitiv ist -- die Grundaussage der Ergebnisse
+dürfte daher robust sein \cite{JamesEtAl2021}.
+
+\subsection{Fehlende Bezeichnung der Feature-Importance}
+
+Da die Feature-Importance-Analyse im vorliegenden Code generische
+Bezeichnungen (F0--F29) statt der echten Feature-Namen verwendet, ist
+die Zuordnung der wichtigsten Features zu konkreten Metriken nur durch
+Indexrückschluss möglich. Eine präzisere Implementierung würde die
+Featurenamen direkt aus den verwendeten Listen übergeben, was die
+Interpretierbarkeit der Modelle erheblich verbessern würde
+\cite{LundbergLee2017}.
+
+% =============================================================================
+\section{Gesamtbewertung}
+\label{sec:disk-zusammenfassung}
+% =============================================================================
+
+Die vorliegende Arbeit zeigt, dass Machine-Learning-basierte Vorhersage
+von Bundesliga-Spielergebnissen mit sorgfältigem Feature Engineering
+und gezielter Behandlung der Klassen-Imbalance zu Ergebnissen führt,
+die den in der Literatur beschriebenen Stand des Möglichen für Pre-Match-Vorhersagen
+widerspiegeln. Die Integration von Expected-Goals-Daten liefert einen
+konsistenten, wenn auch moderaten Mehrwert.
+
+Die methodischen Stärken der Arbeit liegen in der konsequenten
+Vermeidung von Data Leakage durch den Lag-1-Ansatz und die Shift-Operation
+bei der EWA-Berechnung, in der systematischen Evaluation von zwölf
+Datensatzvarianten über fünf Algorithmen, sowie in der gezielten
+Konstruktion von Unentschieden-Features, die nachweislich zu überdurchschnittlichen
+F1-Draw-Werten führen.
+
+Die wesentliche Limitation liegt in der Granularität der verfügbaren
+xG-Daten: Saisonale Pre-Match-Durchschnitte liefern ein deutlich
+schwächeres Signal als matchweises Post-Match-xG. Zukünftige Arbeiten
+sollten matchweise xG-Zeitreihen verwenden und ein temporal-konsistentes
+Evaluationsdesign wählen, um die Übertragbarkeit der Befunde auf
+reale Vorhersageszenarien zu stärken.

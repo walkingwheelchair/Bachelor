@@ -36,8 +36,8 @@ und werden über die Bibliothek \texttt{pandas} \cite{McKinney2010} eingelesen.
 
 Das Laden aller Bundesliga-Daten übernimmt die Funktion
 \texttt{load\_bundesliga\_data()} in \texttt{utils.py}. Sie iteriert über
-alle CSV-Dateien im Bundesliga-Verzeichnis, die über das
-\texttt{glob}-Modul aufgefunden werden:
+alle CSV-Dateien im Bundesliga-Verzeichnis und wendet dabei zwei bewusste
+Designentscheidungen um:
 
 \begin{lstlisting}[language=Python, caption={Kernauszug aus \texttt{load\_bundesliga\_data()}},
                    label={lst:load-bundesliga}]
@@ -55,110 +55,43 @@ for f in files:
     df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, errors="coerce")
 \end{lstlisting}
 
-Mehrere Designentscheidungen sind hier bewusst getroffen worden. Erstens
-wird zunächst UTF-8-Kodierung versucht; schlägt dies fehl, wird automatisch
-auf Latin-1 zurückgefallen. Dies ist notwendig, da ältere Datensätze
-teilweise in Latin-1 kodiert sind und ohne diesen Fallback nicht
-eingelesen werden könnten. Zweitens extrahiert \texttt{\_parse\_season\_label()}
-die Saisonbezeichnung direkt aus dem Dateinamen -- zum Beispiel ergibt
-\texttt{Bundesliga 2016-2017.csv} die Bezeichnung \texttt{2016/17}. Dies
-stellt sicher, dass die Saison-Information nicht manuell gepflegt werden
-muss, sondern automatisch aus der Dateistruktur abgeleitet wird.
-
-Nach dem Zusammenführen aller Einzeldateien wird der Gesamtdatensatz
-bereinigt: Zeilen mit unzulässigen FTR-Werten werden verworfen, und
-numerische Spalten wie Tor- und Schusszahlen werden explizit in
-\texttt{float} konvertiert -- da \texttt{pandas} bei gemischten Datentypen
-diese als Objekt einlesen kann, was spätere Berechnungen stören würde.
-Abschließend wird der DataFrame chronologisch nach Saison und Datum sortiert:
-
-\begin{lstlisting}[language=Python, caption={Finale Bereinigung und Sortierung},
-                   label={lst:load-clean}]
-all_data = all_data.dropna(subset=["FTR"])
-all_data["FTR"] = all_data["FTR"].str.strip()
-all_data = all_data[all_data["FTR"].isin(["H", "D", "A"])]
-for col in ["FTHG", "FTAG", "HS", "AS", "HST", "AST", "HTHG", "HTAG"]:
-    if col in all_data.columns:
-        all_data[col] = pd.to_numeric(all_data[col], errors="coerce")
-all_data = all_data.sort_values(["Season", "Date"]).reset_index(drop=True)
-\end{lstlisting}
+Erstens wird zunächst UTF-8-Kodierung versucht; schlägt dies fehl, wird
+automatisch auf Latin-1 zurückgefallen, da ältere Datensätze teilweise
+in Latin-1 kodiert sind. Zweitens extrahiert \texttt{\_parse\_season\_label()}
+die Saisonbezeichnung direkt aus dem Dateinamen -- \texttt{Bundesliga 2016-2017.csv}
+ergibt \texttt{2016/17}. Nach dem Zusammenführen werden Zeilen mit
+unzulässigen FTR-Werten verworfen und numerische Spalten explizit in
+\texttt{float} konvertiert. Der vollständige Bereinigungscode findet sich
+in Anhang~\ref{app:code} (Listing~\ref{lst:load-clean}).
 
 \subsection{Teamnamen-Normalisierung}
 
 Ein zentrales Problem bei der Zusammenführung beider Datenquellen ist die
-inkonsistente Schreibweise von Teamnamen. So erscheint Borussia Dortmund
-in den Bundesliga-CSVs als \texttt{"Dortmund"}, in den xG-Dateien hingegen
-als \texttt{"Borussia Dortmund"}. Ohne Normalisierung würde der spätere
-Join scheitern und xG-Features für diese Teams fehlen.
-
-Die Lösung ist das Dictionary \texttt{TEAM\_NAME\_MAP} in \texttt{utils.py},
-das alle bekannten Schreibvarianten auf eine einheitliche Zielform abbildet.
-Die Funktion \texttt{normalize\_team()} wendet dieses Mapping auf jeden
-Teamnamen an:
-
-\begin{lstlisting}[language=Python, caption={\texttt{normalize\_team()} und Mapping-Auszug},
-                   label={lst:normalize}]
-TEAM_NAME_MAP = {
-    "Dortmund":          "Borussia Dortmund",
-    "Borussia Dortmund": "Borussia Dortmund",
-    "M'gladbach":        "Borussia M.Gladbach",
-    "Ein Frankfurt":     "Eintracht Frankfurt",
-    "RB Leipzig":        "RasenBallsport Leipzig",
-    # ... (weitere Eintraege)
-}
-
-def normalize_team(name: str) -> str:
-    name = str(name).strip()
-    return TEAM_NAME_MAP.get(name, name)
-\end{lstlisting}
-
-Das Mapping deckt alle 36 Vereine ab, die in den zehn betrachteten
-Saisons in der Bundesliga vertreten waren. Trifft \texttt{normalize\_team()}
-auf einen unbekannten Namen, gibt es diesen unverändert zurück -- ein
-bewusst defensives Vorgehen, das sicherstellt, dass neue Teams (etwa
-Aufsteiger) nicht stillschweigend verworfen werden.
+inkonsistente Schreibweise von Teamnamen: Borussia Dortmund erscheint in
+den Bundesliga-CSVs als \texttt{"Dortmund"}, in den xG-Dateien hingegen
+als \texttt{"Borussia Dortmund"}. Die Lösung ist das Dictionary
+\texttt{TEAM\_NAME\_MAP} in \texttt{utils.py}, das alle bekannten
+Schreibvarianten aller 36 vorkommenden Vereine auf eine einheitliche
+Zielform abbildet (Anhang~\ref{app:code}, Listing~\ref{lst:normalize}).
+Trifft \texttt{normalize\_team()} auf einen unbekannten Namen, gibt es
+diesen unverändert zurück -- ein bewusst defensives Vorgehen, das sicherstellt,
+dass neue Aufsteiger nicht stillschweigend verworfen werden.
 
 \subsection{Laden der xG-Saisondaten}
 
-Die xG-Daten werden über \texttt{load\_xg\_data()} geladen. Im Unterschied
-zu den Spieldaten sind die xG-CSVs durch Semikolons getrennt und enthalten
-saisonale Teamstatistiken. Die wichtigste Transformation ist die Normierung
-der Summenwerte auf einen Per-Spiel-Durchschnitt:
-
-\begin{lstlisting}[language=Python, caption={Per-Spiel-Normierung der xG-Werte},
-                   label={lst:load-xg}]
-if "matches" in df.columns:
-    for col in ["xG", "xGA", "xPTS"]:
-        if col in df.columns:
-            df[f"{col}_per_game"] = (
-                pd.to_numeric(df[col], errors="coerce") /
-                pd.to_numeric(df["matches"], errors="coerce")
-            )
-\end{lstlisting}
-
-\textbf{Warum diese Normierung?} Die Saisonsummen \texttt{xG}, \texttt{xGA}
-und \texttt{xPTS} sind nicht direkt vergleichbar, wenn Teams unterschiedlich
-viele Spiele absolviert haben -- etwa weil ein Team erst zur Rückrunde
-aufgestiegen ist. Die Division durch \texttt{matches} macht alle Werte
-unabhängig von der Anzahl gespielter Partien und erlaubt einen fairen
-saisonübergreifenden Vergleich \cite{AnzerBauer2021}.
+Die xG-Daten werden über \texttt{load\_xg\_data()} geladen. Die wichtigste
+Transformation ist die Normierung der Summenwerte auf einen
+Per-Spiel-Durchschnitt durch Division durch \texttt{matches}
+(Listing~\ref{lst:load-xg} im Anhang). Dies ist notwendig, da
+Saisonsummen bei unterschiedlich vielen Spielen je Team nicht direkt
+vergleichbar sind -- etwa bei Auf- und Absteigern \cite{AnzerBauer2021}.
 
 \subsection{Explorative Datenanalyse}
 
 Nach dem Laden der Daten werden im Notebook mehrere explorative Analysen
-durchgeführt, die das Verständnis des Datensatzes vertiefen und spätere
-Modellierungsentscheidungen motivieren.
+durchgeführt, die Modellierungsentscheidungen motivieren.
 
 \subsubsection{Verteilung der Zielvariable}
-
-Der erste Schritt der explorativen Analyse ist die Betrachtung der
-Klassenverteilung der Zielvariable \texttt{FTR}:
-
-\begin{lstlisting}[language=Python, caption={Visualisierung der FTR-Verteilung},
-                   label={lst:ftr-plot}]
-sns.countplot(data=df_base, x='FTR', order=['H', 'D', 'A'],
-              hue='FTR', legend=False, palette='viridis', ax=ax)
-\end{lstlisting}
 
 \begin{figure}[h]
     \centering
@@ -171,31 +104,18 @@ sns.countplot(data=df_base, x='FTR', order=['H', 'D', 'A'],
 \end{figure}
 
 Abbildung~\ref{fig:ftr-verteilung} zeigt die Ungleichverteilung der
-drei Klassen deutlich. Der Heimvorteil in der Bundesliga führt dazu, dass
-Heimsiege die häufigste Klasse sind, während Unentschieden die seltenste
-Klasse darstellen. Diese Klassen-Imbalance ist der Hauptgrund dafür,
-dass in dieser Arbeit Macro-F1 statt Accuracy als primäre Evaluationsmetrik
-verwendet wird und spezielle Gewichtungsstrategien im Training eingesetzt
-werden \cite{HeGarcia2009}.
+drei Klassen. Der Heimvorteil führt dazu, dass Heimsiege die häufigste
+Klasse sind, während Unentschieden die seltenste darstellen. Diese
+Klassen-Imbalance ist der Hauptgrund, warum Macro-F1 statt Accuracy als
+primäre Evaluationsmetrik verwendet wird \cite{HeGarcia2009}.
 
 \subsubsection{Korrelationsanalyse}
 
-Für die Korrelationsanalyse wird die Zielvariable \texttt{FTR} in einen
-numerischen Wert \texttt{Target\_Heimerfolg} umkodiert:
-\texttt{H}~→~+1, \texttt{D}~→~0, \texttt{A}~→~-1. Diese ordinale
-Kodierung bildet den \glqq Grad des Heimerfolgs\grqq{} ab und erlaubt
-die Berechnung des Pearson-Korrelationskoeffizienten zwischen jedem Feature
-und der Zielvariable \cite{JamesEtAl2021}:
-
-\begin{lstlisting}[language=Python, caption={Kodierung und Korrelationsmatrix},
-                   label={lst:korr}]
-mapping = {'H': 1, 'D': 0, 'A': -1}
-df_base['Target_Heimerfolg'] = df_base['FTR'].map(mapping)
-
-corr_base = df_base[BASE_FEATURES + ['Target_Heimerfolg']].corr()
-sns.heatmap(corr_base, mask=mask, cmap='coolwarm', center=0,
-            annot=True, fmt=".2f", linewidths=0.5)
-\end{lstlisting}
+Für die Korrelationsanalyse wird \texttt{FTR} numerisch kodiert
+(\texttt{H}~=~+1, \texttt{D}~=~0, \texttt{A}~=~-1), um den
+Pearson-Korrelationskoeffizienten zwischen jedem Feature und der
+Zielvariable zu berechnen \cite{JamesEtAl2021}. Der zugehörige Code
+findet sich in Anhang~\ref{app:code} (Listing~\ref{lst:korr}).
 
 \begin{figure}[h]
     \centering
@@ -207,13 +127,12 @@ sns.heatmap(corr_base, mask=mask, cmap='coolwarm', center=0,
     \label{fig:korrelation-target}
 \end{figure}
 
-Abbildung~\ref{fig:korrelation-target} zeigt den sortierten Barplot der
-Feature-Korrelationen. Die Analyse zeigt, dass punktebezogene EWA-Features
-(\texttt{points\_diff\_avg}, \texttt{home\_team\_overall\_ewa\_Points})
-die stärksten positiven Korrelationen mit dem Heimerfolg aufweisen, während
-die entsprechenden Auswärts-Features die stärksten negativen Korrelationen
-zeigen. Dieses Ergebnis motiviert die spätere Feature-Selektion mit einem
-Korrelationsschwellenwert von $|\,r\,| > 0{,}1$.
+Abbildung~\ref{fig:korrelation-target} zeigt, dass punktebezogene
+EWA-Features (\texttt{points\_diff\_avg},
+\texttt{home\_team\_overall\_ewa\_Points}) die stärksten positiven
+Korrelationen mit dem Heimerfolg aufweisen. Dieses Ergebnis motiviert
+die spätere Feature-Selektion mit einem Schwellenwert von
+$|\,r\,| > 0{,}1$.
 
 % =============================================================================
 \section{Feature Engineering}
@@ -227,71 +146,26 @@ Rohe Spielstatistiken -- Tore, Schüsse, Ergebnis -- sind für ein
 Machine-Learning-Modell ohne Kontextualisierung wenig aussagekräftig:
 Das Ergebnis eines einzelnen Spiels ist stark zufallsbehaftet, während
 die Teamform über mehrere Spiele hinweg ein stabileres Signal liefert
-\cite{Wheatcroft2022}. Ziel des Feature Engineerings ist es daher,
-für jedes bevorstehende Spiel ein Abbild der aktuellen Stärke und Form
-beider Teams zu berechnen -- ausschließlich auf Basis vergangener Informationen.
-
-Die zentrale Funktion hierfür ist \texttt{compute\_rolling\_features()}
-in \texttt{utils.py}. Sie wird nach dem Laden der Rohdaten aufgerufen
-und ergänzt den DataFrame um 20 EWA-basierte Form-Features.
+\cite{Wheatcroft2022}. Die zentrale Funktion \texttt{compute\_rolling\_features()}
+in \texttt{utils.py} ergänzt den DataFrame um 20 EWA-basierte Form-Features.
 
 \subsection{Transformation ins Team-Spiel-Format}
 
 Als erstes wird jedes Spiel in zwei Beobachtungen aufgeteilt: eine
-aus Perspektive des Heimteams, eine aus Perspektive des Auswärtsteams.
-Dies erzeugt ein \emph{langes} Format, in dem jede Zeile einem
-Team-in-einem-Spiel entspricht:
-
-\begin{lstlisting}[language=Python, caption={Transformation ins Team-Spiel-Format},
-                   label={lst:longformat}]
-home_stats = df[["Season","Date","HomeTeam","FTHG","FTAG",
-                  "FTR","HS","HST"]].copy()
-home_stats.rename(columns={
-    "HomeTeam": "Team", "FTHG": "GoalsScored",
-    "FTAG": "GoalsConceded", "HS": "Shots",
-    "HST": "ShotsOnTarget"
-}, inplace=True)
-home_stats["is_home"] = 1
-
-away_stats = df[["Season","Date","AwayTeam","FTHG","FTAG",
-                  "FTR","AS","AST"]].copy()
-away_stats.rename(columns={
-    "AwayTeam": "Team", "FTAG": "GoalsScored",   # Achtung: FTAG!
-    "FTHG": "GoalsConceded", "AS": "Shots",
-    "AST": "ShotsOnTarget"
-}, inplace=True)
-away_stats["is_home"] = 0
-\end{lstlisting}
-
-Zu beachten ist, dass beim Auswärtsteam die Spalten \texttt{FTAG}
-(Away Goals) als \texttt{GoalsScored} und \texttt{FTHG} (Home Goals)
-als \texttt{GoalsConceded} zugeordnet werden -- aus der Perspektive
-des Auswärtsteams sind die Gegentore die Tore des Heimteams. Dieses
-Umpolen ist essenziell, damit alle EWA-Werte eine einheitliche
-semantische Bedeutung haben: \texttt{GoalsScored} ist immer die Anzahl
-erzielte Tore des betrachteten Teams, unabhängig davon, ob es Heim- oder
-Auswärtsteam ist.
+aus Perspektive des Heimteams, eine aus Perspektive des Auswärtsteams
+(Listing~\ref{lst:longformat} im Anhang). Dabei werden die Spalten für
+das Auswärtsteam konsequent umgepolt: \texttt{FTAG} wird zu
+\texttt{GoalsScored}, \texttt{FTHG} zu \texttt{GoalsConceded} -- da aus
+Sicht des Gastes die gegnerischen Tore die eigenen Gegentore sind. Dies
+stellt sicher, dass \texttt{GoalsScored} und \texttt{GoalsConceded} über
+alle Teams hinweg eine einheitliche semantische Bedeutung haben.
 
 \subsection{Punkteberechnung}
 
-Aus dem langen Format werden teamspezifische Punktwerte berechnet.
-Die Logik berücksichtigt, ob das Team Heim- oder Auswärtsteam war:
-
-\begin{lstlisting}[language=Python, caption={Punkteberechnung aus Teamperspektive},
-                   label={lst:punkte}]
-def calc_points(row):
-    if row["FTR"] == "D": return 1
-    if row["is_home"] == 1 and row["FTR"] == "H": return 3
-    if row["is_home"] == 0 and row["FTR"] == "A": return 3
-    return 0
-
-all_stats["Points"] = all_stats.apply(calc_points, axis=1)
-\end{lstlisting}
-
-Diese Funktion weist jedem Team in jedem Spiel genau den Punktwert zu,
-den es tatsächlich in der Bundesliga-Tabelle erhalten hat: drei Punkte
-für einen Sieg, einen Punkt für ein Unentschieden und null Punkte für
-eine Niederlage.
+Aus dem langen Format werden teamspezifische Punktwerte berechnet: drei
+Punkte für einen Sieg, einer für ein Unentschieden, null für eine Niederlage
+-- jeweils aus Teamperspektive (Anhang~\ref{app:code},
+Listing~\ref{lst:punkte}).
 
 \subsection{EWA-Berechnung mit Shift-Operation}
 
@@ -319,122 +193,46 @@ EWA-Wert für Spiel $t$ das Ergebnis von Spiel $t$ selbst beinhalten.
 Das Modell hätte damit implizit Zugang zum Ergebnis des Spiels, das es
 vorhersagen soll -- ein klassisches Data-Leakage-Problem
 \cite{KaufmanRossetPerlich2012}. Durch \texttt{.shift(1)} wird
-sichergestellt, dass für jedes Spiel ausschließlich die Statistiken
-der \emph{vorangegangenen} Spiele in die EWA einfließen.
-
-Die EWA selbst wird mit \texttt{.ewm(span=10, min\_periods=1).mean()}
-berechnet. Der Span-Parameter $s = 10$ entspricht einem Glättungsfaktor
-von $\alpha = \frac{2}{11} \approx 0{,}182$. Dies bedeutet, dass das
-jüngste Spiel ein Gewicht von 18,2\,\% erhält, das zweitjüngste
-$(1-0{,}182) \cdot 0{,}182 \approx 14{,}9\,\%$, und so weiter.
-Der Parameter \texttt{min\_periods=1} erlaubt die Berechnung auch dann,
-wenn für ein Team erst ein einziges Vorspiel vorliegt -- relevant
-insbesondere für Aufsteiger zu Beginn ihrer ersten Saison.
+sichergestellt, dass ausschließlich die Statistiken
+\emph{vorangegangener} Spiele einfließen. Die EWA selbst wird mit
+\texttt{.ewm(span=10, min\_periods=1).mean()} berechnet; der
+Glättungsfaktor beträgt $\alpha = \frac{2}{11} \approx 0{,}182$.
 
 \subsection{Drei EWA-Kontexte}
 
-Die EWA-Berechnung wird in drei separaten Kontexten durchgeführt,
-um den Unterschied zwischen Heim- und Auswärtsperformance abzubilden:
-
-\begin{lstlisting}[language=Python, caption={Berechnung in drei Kontexten},
-                   label={lst:drei-kontexte}]
-# 1. OVERALL: alle Spiele (Heim und Auswaerts)
-overall_ewa = compute_ewa(all_stats, span)
-overall_ewa.columns = [f"overall_ewa_{c}" for c in overall_ewa.columns]
-
-# 2. HOME FORM: nur Heimspiele des Heimteams
-home_only = all_stats[all_stats["is_home"] == 1].copy()
-home_ewa  = compute_ewa(home_only, span)
-home_ewa.columns = [f"home_form_ewa_{c}" for c in home_ewa.columns]
-
-# 3. AWAY FORM: nur Auswaertsspiele des Auswaertsteams
-away_only = all_stats[all_stats["is_home"] == 0].copy()
-away_ewa  = compute_ewa(away_only, span)
-away_ewa.columns = [f"away_form_ewa_{c}" for c in away_ewa.columns]
-\end{lstlisting}
-
-\textbf{Warum drei Kontexte?} Die Literatur zeigt, dass Heim- und
-Auswärtsform unterschiedliche Stabilitätseigenschaften aufweisen
-\cite{DobsonGoddard2011}: Manche Teams sind zu Hause dominant, schwächeln
-aber auswärts erheblich. Ein reiner Gesamt-EWA würde diese Information
-verwischen. Durch die Trennung in drei Kontexte erhält das Modell
-sowohl ein Gesamtbild der Teamstärke (\texttt{overall\_ewa}) als auch
-die spezifische Heimstärke des Heimteams (\texttt{home\_form\_ewa})
-und die spezifische Auswärtsstärke des Auswärtsteams
-(\texttt{away\_form\_ewa}).
-
-Pro Kontext werden fünf Metriken berechnet -- erzielte Tore, kassierte
-Tore, Punkte, Schüsse und Schüsse aufs Tor -- jeweils für Heim- und
-Auswärtsteam. Das ergibt $3 \times 5 \times 2 = 30$ Feature-Spalten,
-die jedoch auf 20 reduziert werden, da \texttt{home\_form\_ewa} nur
-für das Heimteam und \texttt{away\_form\_ewa} nur für das Auswärtsteam
-berechnet wird.
-
-\subsection{Merge der EWA-Features in den Haupt-DataFrame}
-
-Die berechneten EWA-Werte werden nach der Berechnung wieder in den
-originalen Match-Level-DataFrame zurückgemergt. Dies geschieht über
-einen Join auf den Spalten \texttt{Date} und \texttt{Team}:
-
-\begin{lstlisting}[language=Python, caption={Merge der EWA-Features},
-                   label={lst:merge-ewa}]
-h_all.columns = [f"home_team_{c}" if c not in ["Date","Team"]
-                 else c for c in h_all.columns]
-a_all.columns = [f"away_team_{c}" if c not in ["Date","Team"]
-                 else c for c in a_all.columns]
-
-df = df.merge(h_all, left_on=["Date","HomeTeam"],
-              right_on=["Date","Team"], how="left").drop(columns=["Team"])
-df = df.merge(a_all, left_on=["Date","AwayTeam"],
-              right_on=["Date","Team"], how="left").drop(columns=["Team"])
-\end{lstlisting}
-
-Das Präfix-Schema \texttt{home\_team\_*} bzw.\ \texttt{away\_team\_*}
-stellt sicher, dass alle 20 EWA-Features eindeutig benannt sind und
-klar erkennbar ist, für welches Team welcher Wert gilt.
+Die EWA-Berechnung wird in drei separaten Kontexten durchgeführt
+(Listing~\ref{lst:drei-kontexte} im Anhang):
+\texttt{overall\_ewa} über alle Spiele, \texttt{home\_form\_ewa}
+ausschließlich über Heimspiele des Heimteams, und \texttt{away\_form\_ewa}
+ausschließlich über Auswärtsspiele des Auswärtsteams. Diese Trennung
+ist durch Befunde motiviert, die zeigen, dass Heim- und Auswärtsform
+unterschiedliche Stabilitätseigenschaften aufweisen \cite{DobsonGoddard2011}.
+Pro Kontext werden fünf Metriken berechnet, was in $3 \times 5 \times 2 = 30$
+Feature-Spalten resultiert, die auf 20 reduziert werden, da
+\texttt{home\_form\_ewa} nur für das Heimteam und
+\texttt{away\_form\_ewa} nur für das Auswärtsteam genutzt wird. Die
+anschließende Rückführung in den Match-Level-DataFrame erfolgt über
+einen Daten-Join auf \texttt{Date} und \texttt{Team} mit dem
+Präfix-Schema \texttt{home\_team\_*} / \texttt{away\_team\_*}
+(Listing~\ref{lst:merge-ewa} im Anhang).
 
 \subsection{Abgeleitete Differenz-Features}
 
 Nach der EWA-Berechnung werden fünf weitere Features als Differenzen
-zwischen Heim- und Auswärtsteam konstruiert. Dies geschieht in
-\texttt{add\_derived\_features()}:
-
-\begin{lstlisting}[language=Python, caption={Berechnung der Differenz-Features},
-                   label={lst:diff-features}]
-df["goal_diff_avg"]   = (df["home_team_overall_ewa_GoalsScored"]
-                         - df["away_team_overall_ewa_GoalsScored"])
-df["points_diff_avg"] = (df["home_team_overall_ewa_Points"]
-                         - df["away_team_overall_ewa_Points"])
-
-df["abs_goal_diff"]   = df["goal_diff_avg"].abs()
-df["abs_points_diff"] = df["points_diff_avg"].abs()
-
-df["combined_draw_tendency"] = (
-    1.0 / (1.0 + df["abs_goal_diff"]) *
-    1.0 / (1.0 + df["abs_points_diff"])
-)
-\end{lstlisting}
-
-Jedes dieser Features hat eine klare inhaltliche Motivation:
+konstruiert (Anhang~\ref{app:code}, Listing~\ref{lst:diff-features}).
 \texttt{goal\_diff\_avg} und \texttt{points\_diff\_avg} quantifizieren
-den relativen Stärkevorteil des Heimteams. Die Absolutwerte
-\texttt{abs\_goal\_diff} und \texttt{abs\_points\_diff} messen, wie
-ausgeglichen das Spiel ist -- je kleiner dieser Wert, desto ähnlicher
-sind beide Teams, was ein Unentschieden wahrscheinlicher macht.
-
-Der \texttt{combined\_draw\_tendency}-Index kombiniert beide Absolutwerte
-multiplikativ. Sind beide Differenzen nahe null, tendiert der Ausdruck
-gegen 1 (hohes Gleichgewicht, hohes Unentschieden-Potential). Sobald
-eine der Differenzen groß wird, sinkt der Index stark, da der
-Nenner wächst. Dieser gezielt konstruierte Feature ist eine Reaktion
-auf die bekannte Schwäche von ML-Modellen bei der Vorhersage von
-Unentschieden \cite{HeGarcia2009,ChawlaEtAl2002}.
+den relativen Stärkevorteil des Heimteams; ihre Absolutwerte
+\texttt{abs\_goal\_diff} und \texttt{abs\_points\_diff} messen die
+Ausgeglichenheit beider Teams. Der \texttt{combined\_draw\_tendency}-Index
+kombiniert beide Absolutwerte multiplikativ: Je kleiner die Differenzen,
+desto höher der Index und desto wahrscheinlicher ein Unentschieden --
+eine gezielte Reaktion auf die bekannte Schwäche von ML-Modellen bei
+dieser Klasse \cite{HeGarcia2009,ChawlaEtAl2002}.
 
 \subsection{xG-Integration mit Lag-1-Strategie}
 
 Die xG-Daten werden in \texttt{merge\_xg\_features()} über eine
-Lag-1-Strategie in den Datensatz integriert. Der Kern der Implementierung
-ist die explizite Konstruktion eines \texttt{MatchSeason}-Mappings:
+Lag-1-Strategie integriert, um Data Leakage zu verhindern:
 
 \begin{lstlisting}[language=Python, caption={Lag-1-Strategie in \texttt{merge\_xg\_features()}},
                    label={lst:lag1}]
@@ -454,69 +252,22 @@ for i, s in enumerate(all_seasons):
 xg_mapped = pd.concat(rows, ignore_index=True)
 \end{lstlisting}
 
-Dieses Vorgehen realisiert folgende Logik: Für jede \emph{historisch
-abgeschlossene} Saison $s$ werden die xG-Werte der Vorsaison $s-1$
-als Prior eingesetzt. Nur für die \emph{aktuelle, noch laufende}
-Saison (das Maximum im Datensatz) werden die Saisonwerte direkt
-genutzt, da diese wöchentlich aktualisiert verfügbar sind. Das
-fertige \texttt{xg\_mapped} wird dann zweimal mit dem Match-DataFrame
-gejoined -- einmal für das Heimteam, einmal für das Auswärtsteam:
-
-\begin{lstlisting}[language=Python, caption={Zweifacher Join für Heim- und Auswärtsteam},
-                   label={lst:xg-join}]
-home_xg = xg_mapped.rename(columns={
-    "Team": "HomeTeam", "MatchSeason": "Season",
-    "xG_per_game":  "home_xG_per_game",
-    "xGA_per_game": "home_xGA_per_game",
-    "xPTS_per_game":"home_xPTS_per_game",
-})
-result = match_df.merge(home_xg, on=["HomeTeam", "Season"], how="left")
-# Analog fuer Auswaertsteam
-\end{lstlisting}
-
-\textbf{Konsequenz für den Datensatz:} Da für die erste Saison im
-Datensatz (2016/17) keine Vorsaison-xG-Werte existieren, erhalten alle
-Spiele dieser Saison nach dem Join NaN-Werte für die xG-Features.
-Diese Zeilen werden im anschließenden \texttt{dropna()}-Schritt
-entfernt, was erklärt, warum der xG-erweiterte Datensatz mit
-$\sim$2.280 Spielen kleiner ist als der Basisdatensatz mit
-$\sim$2.955 Spielen.
+Für jede historisch abgeschlossene Saison $s$ werden die xG-Werte der
+Vorsaison $s-1$ als Prior verwendet, da Saisonendstatistiken erst nach
+dem letzten Spieltag feststehen. Nur für die aktuelle Saison werden
+die laufenden Werte direkt genutzt. Der anschließende Join auf
+\texttt{HomeTeam}/\texttt{AwayTeam} und \texttt{Season} erfolgt separat
+für Heim- und Auswärtsteam (Anhang~\ref{app:code}, Listing~\ref{lst:xg-join}).
+Da für die erste Saison (2016/17) keine Vorsaison-xG vorliegen, enthält
+der xG-Datensatz mit $\sim$2.280 Spielen weniger Beobachtungen als der
+Basisdatensatz ($\sim$2.955 Spiele).
 
 \subsection{Finale Feature-Sets}
 
 Die beiden Feature-Listen sind als Konstanten in \texttt{utils.py}
-definiert:
-
-\begin{lstlisting}[language=Python, caption={Definition der Feature-Sets},
-                   label={lst:feature-sets}]
-BASE_FEATURES = [
-    # Overall EWA -- Heimteam (5 Features)
-    "home_team_overall_ewa_GoalsScored",
-    "home_team_overall_ewa_GoalsConceded",
-    "home_team_overall_ewa_Points",
-    "home_team_overall_ewa_Shots",
-    "home_team_overall_ewa_ShotsOnTarget",
-    # Heimform EWA -- Heimteam (5 Features)
-    "home_team_home_form_ewa_GoalsScored", # ... (5 weitere)
-    # Overall EWA -- Auswaertsteam (5 Features)
-    "away_team_overall_ewa_GoalsScored",   # ... (5 weitere)
-    # Auswaertsform EWA -- Auswaertsteam (5 Features)
-    "away_team_away_form_ewa_GoalsScored", # ... (5 weitere)
-    # Differenz-Features (5 Features)
-    "goal_diff_avg", "points_diff_avg",
-    "abs_goal_diff", "abs_points_diff",
-    "combined_draw_tendency",
-]  # = 25 Features gesamt
-
-XG_FEATURES = BASE_FEATURES + [
-    "home_xG_per_game",  "home_xGA_per_game",  "home_xPTS_per_game",
-    "away_xG_per_game",  "away_xGA_per_game",  "away_xPTS_per_game",
-    "xG_diff", "xGA_diff", "abs_xG_diff",
-]  # = 34 Features gesamt
-\end{lstlisting}
-
-Tabelle~\ref{tab:feature-sets-impl} fasst die Zusammensetzung beider
-Feature-Sets zusammen.
+definiert (vollständige Definition: Anhang~\ref{app:code},
+Listing~\ref{lst:feature-sets}).
+Tabelle~\ref{tab:feature-sets-impl} fasst die Zusammensetzung zusammen.
 
 \begin{table}[h]
     \centering
@@ -526,14 +277,14 @@ Feature-Sets zusammen.
         \toprule
         \textbf{Feature-Gruppe} & \textbf{BASE} & \textbf{XG} \\
         \midrule
-        Overall EWA Heimteam (5 Metriken)      & 5  & 5  \\
-        Heimform EWA Heimteam (5 Metriken)     & 5  & 5  \\
-        Overall EWA Auswärtsteam (5 Metriken)  & 5  & 5  \\
-        Auswärtsform EWA Auswärtsteam (5 Metriken) & 5 & 5 \\
-        Differenz-Features                     & 5  & 5  \\
-        xG-basierte Features (6 + 3 Diff.)     & 0  & 9  \\
+        Overall EWA Heimteam (5 Metriken)          & 5  & 5  \\
+        Heimform EWA Heimteam (5 Metriken)         & 5  & 5  \\
+        Overall EWA Auswärtsteam (5 Metriken)      & 5  & 5  \\
+        Auswärtsform EWA Auswärtsteam (5 Metriken) & 5  & 5  \\
+        Differenz-Features                         & 5  & 5  \\
+        xG-basierte Features (6 + 3 Diff.)         & 0  & 9  \\
         \midrule
-        \textbf{Gesamt}                        & \textbf{25} & \textbf{34} \\
+        \textbf{Gesamt}                            & \textbf{25} & \textbf{34} \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -545,109 +296,43 @@ Feature-Sets zusammen.
 
 \subsection{Kodierung der Zielvariable}
 
-Für die ML-Modelle wird die kategorische Zielvariable \texttt{FTR}
-in einen ganzzahligen Klassenindex überführt. Dies erfolgt über
-\texttt{sklearn}'s \texttt{LabelEncoder}:
-
-\begin{lstlisting}[language=Python, caption={LabelEncoder für die Zielvariable},
-                   label={lst:labelencoder}]
-le = LabelEncoder()
-df_base['Target']    = le.fit_transform(df_base['FTR'])
-df_with_xg['Target'] = le.transform(df_with_xg['FTR'])
-\end{lstlisting}
-
-Der \texttt{LabelEncoder} ordnet alphabetisch zu: \texttt{A}~→~0,
-\texttt{D}~→~1, \texttt{H}~→~2. Wichtig ist, dass \texttt{fit\_transform}
-nur auf \texttt{df\_base} aufgerufen wird und \texttt{df\_with\_xg}
-lediglich per \texttt{transform} (ohne erneutes Fitting) transformiert
-wird. So ist garantiert, dass beide Datensätze dasselbe Klassenindex-Mapping
-verwenden, was die spätere Interpretation der Ergebnisse konsistent hält.
+Die kategorische Zielvariable \texttt{FTR} wird über
+\texttt{sklearn}'s \texttt{LabelEncoder} in ganzzahlige Klassenindizes
+überführt: \texttt{A}~→~0, \texttt{D}~→~1, \texttt{H}~→~2
+(Listing~\ref{lst:labelencoder} im Anhang). Entscheidend ist, dass
+\texttt{fit\_transform} ausschließlich auf \texttt{df\_base} angewendet
+wird; \texttt{df\_with\_xg} wird nur mit \texttt{transform} ohne erneutes
+Fitting transformiert, um dasselbe Klassenindex-Mapping zu gewährleisten.
 
 \subsection{Konstruktion der Datensatzvarianten}
 
 \subsubsection{Ausreißerbereinigung (IQR)}
 
-Die Ausreißerbereinigung erfolgt über die Funktion
-\texttt{remove\_outliers\_iqr()}:
-
-\begin{lstlisting}[language=Python, caption={IQR-basierte Ausreißerbereinigung},
-                   label={lst:iqr}]
-def remove_outliers_iqr(df, features, multiplier=3.0):
-    df_out = df.copy()
-    for col in features:
-        Q1  = df_out[col].quantile(0.25)
-        Q3  = df_out[col].quantile(0.75)
-        IQR = Q3 - Q1
-        df_out = df_out[~(
-            (df_out[col] < (Q1 - multiplier * IQR)) |
-            (df_out[col] > (Q3 + multiplier * IQR))
-        )]
-    return df_out
-\end{lstlisting}
-
-Der Multiplikator von $c = 3{,}0$ -- statt des üblicheren $c = 1{,}5$
--- wurde bewusst gewählt. Bei EWA-Features, die über viele Spiele
-geglättet werden, sind extreme Ausreißer selten und deuten häufig auf
-außergewöhnliche Spielverläufe hin (z.\,B.\ 8:0-Ergebnisse). Ein
-strengeres $c = 1{,}5$ würde zu viele Datenpunkte entfernen und das
-Modell um wichtige Randinformationen berauben. Mit $c = 3{,}0$
-werden nur statistisch extrem abweichende Werte entfernt, was den
-Datenverlust minimiert \cite{JamesEtAl2021}.
+Die Funktion \texttt{remove\_outliers\_iqr()} entfernt Beobachtungen
+außerhalb von $[Q_1 - c \cdot \text{IQR},\; Q_3 + c \cdot \text{IQR}]$
+(Anhang~\ref{app:code}, Listing~\ref{lst:iqr}). Der Multiplikator
+$c = 3{,}0$ -- statt des üblicheren $c = 1{,}5$ -- wurde bewusst
+konservativ gewählt: Bei EWA-geglätteten Features sind extreme Ausreißer
+selten; ein strengerer Wert würde zu viele informationsreiche
+Randbeobachtungen entfernen \cite{JamesEtAl2021}.
 
 \subsubsection{Feature-Selektion via Korrelation}
 
-Die Funktion \texttt{get\_strong\_features()} identifiziert Features
-mit starkem linearen Zusammenhang zur Zielvariable:
-
-\begin{lstlisting}[language=Python, caption={Korrelationsbasierte Feature-Selektion},
-                   label={lst:feature-sel}]
-def get_strong_features(df, features,
-                         target_col='Target_Heimerfolg',
-                         threshold=0.1):
-    corr = df[features + [target_col]].corr()[target_col].abs()
-    corr = corr.drop(target_col)
-    strong = corr[corr > threshold].index.tolist()
-    if len(strong) == 0:
-        strong = corr.sort_values(ascending=False).head(5).index.tolist()
-    return strong
-\end{lstlisting}
-
-Der Schwellenwert $|\,r\,| > 0{,}1$ ist als konservative untere Schranke
-gewählt. Bei einem Pearson-Korrelationskoeffizienten unter 0,1 liegt
-der lineare Zusammenhang im Bereich des statistischen Rauschens -- solche
-Features tragen kaum zur Trennbarkeit der Klassen bei \cite{JamesEtAl2021}.
-Die Fallback-Logik (wenn kein Feature den Schwellenwert überschreitet,
-werden die fünf korreliertesten gewählt) verhindert einen leeren
-Feature-Raum, was den Algorithmus robuster gegen unerwartete Daten macht.
+\texttt{get\_strong\_features()} behält nur Features mit einem absoluten
+Pearson-Korrelationskoeffizienten $|\,r\,| > 0{,}1$ zur numerisch
+kodierten Zielvariable (Listing~\ref{lst:feature-sel} im Anhang). Dieser
+Schwellenwert ist als konservative untere Schranke gewählt: Features
+unterhalb davon tragen kaum zur Trennbarkeit der Klassen bei
+\cite{JamesEtAl2021}.
 
 \subsubsection{PCA-Varianten}
 
-Die \texttt{apply\_pca()}-Funktion führt eine PCA auf dem jeweils
-selektierten Feature-Set durch:
-
-\begin{lstlisting}[language=Python, caption={PCA-Transformation auf 95\,\% Varianz},
-                   label={lst:pca-impl}]
-def apply_pca(df, features, variance=0.95):
-    scaler_pca = StandardScaler()
-    X_scaled   = scaler_pca.fit_transform(df[features])
-    pca = PCA(n_components=variance, random_state=42)
-    X_pca        = pca.fit_transform(X_scaled)
-    n_components = pca.n_components_
-    col_names    = [f'PC{i+1}' for i in range(n_components)]
-    df_pca = pd.DataFrame(X_pca, index=df.index, columns=col_names)
-    df_pca['Target'] = df['Target'].values
-    df_pca['FTR']    = df['FTR'].values
-    return df_pca, col_names, n_components
-\end{lstlisting}
-
-Beachtenswert ist, dass der \texttt{StandardScaler} innerhalb von
-\texttt{apply\_pca()} genutzt wird und \emph{ausschließlich} auf den
-Daten des aktuellen Datensatzes gefittet wird. Die PCA selbst erhält
-als \texttt{n\_components}-Argument den Wert 0,95 -- \texttt{sklearn}'s
-PCA-Implementierung interpretiert Werte $< 1$ als erklärten
-Varianzanteil und wählt automatisch die minimale Komponentenzahl, die
-diesen Anteil erreicht \cite{ScikitLearn2024}. Die PCA-Analyse wird
-auch visuell ausgewertet.
+\texttt{apply\_pca()} führt eine PCA durch, die auf 95\,\% erklärter
+Varianz beschränkt wird (Listing~\ref{lst:pca-impl} im Anhang). Der
+\texttt{StandardScaler} wird dabei ausschließlich auf den aktuellen
+Daten gefittet; \texttt{sklearn}'s PCA interpretiert
+\texttt{n\_components=0.95} automatisch als Varianzanteil
+\cite{ScikitLearn2024}.
 
 \begin{figure}[h]
     \centering
@@ -659,47 +344,18 @@ auch visuell ausgewertet.
     \label{fig:pca-analyse}
 \end{figure}
 
-Abbildung~\ref{fig:pca-analyse} zeigt exemplarisch die PCA-Analyse für
-Variante~11. Der Scree Plot zeigt, dass die ersten Hauptkomponenten
-den Großteil der Varianz erklären. Die kumulierte Varianz-Kurve
-(Mitte) zeigt, an welchem Punkt die 95\,\%-Schwelle (rote gestrichelte
-Linie) überschritten wird -- die Zahl der links davon liegenden
-Komponenten bestimmt die Dimensionalität des PCA-Feature-Raums.
-Im Biplot (rechts) ist erkennbar, dass die drei Klassen auch in
-der zweidimensionalen PCA-Projektion keine klare lineare Trennbarkeit
-aufweisen -- ein weiterer Beleg für die inhärente Schwierigkeit
-des Vorhersageproblems \cite{Sumpter2016}.
+Im Biplot (Abbildung~\ref{fig:pca-analyse}, rechts) ist erkennbar, dass
+die drei Klassen auch in der zweidimensionalen PCA-Projektion keine
+klare lineare Trennbarkeit aufweisen -- ein Beleg für die inhärente
+Schwierigkeit des Vorhersageproblems \cite{Sumpter2016}.
 
 \subsubsection{Übersicht der zwölf Varianten}
 
-Aus der kombinatorischen Verknüpfung der drei Achsen entstehen die
-in Tabelle~\ref{tab:varianten-impl} definierten zwölf Datensatzvarianten,
-die im Dictionary \texttt{variants} gespeichert werden:
-
-\begin{lstlisting}[language=Python, caption={Definition der 12 Datensatzvarianten},
-                   label={lst:varianten}]
-variants = {
-    " 1. Ohne xG | Raw   | Alle Features":   (df_base_raw,   BASE_FEATURES),
-    " 2. Ohne xG | Raw   | Starke Features": (df_base_raw,   strong_base),
-    " 3. Ohne xG | Clean | Alle Features":   (df_base_clean, BASE_FEATURES),
-    " 4. Ohne xG | Clean | Starke Features": (df_base_clean, strong_base),
-    " 5. Mit xG  | Raw   | Alle Features":   (df_xg_raw,     XG_FEATURES),
-    " 6. Mit xG  | Raw   | Starke Features": (df_xg_raw,     strong_xg),
-    " 7. Mit xG  | Clean | Alle Features":   (df_xg_clean,   XG_FEATURES),
-    " 8. Mit xG  | Clean | Starke Features": (df_xg_clean,   strong_xg),
-    " 9. Ohne xG | Raw   | PCA (Basis V2)":  (df_pca_v2,     pca_cols_v2),
-    "10. Ohne xG | Clean | PCA (Basis V4)":  (df_pca_v4,     pca_cols_v4),
-    "11. Mit xG  | Raw   | PCA (Basis V6)":  (df_pca_v6,     pca_cols_v6),
-    "12. Mit xG  | Clean | PCA (Basis V8)":  (df_pca_v8,     pca_cols_v8),
-}
-\end{lstlisting}
-
-Die PCA-Varianten (9--12) bauen jeweils auf den starken Features
-der korrespondierenden Nicht-PCA-Variante auf: Variante~9 nutzt
-\texttt{strong\_base} auf \texttt{df\_base\_raw} und reduziert
-diese per PCA; Variante~11 nutzt \texttt{strong\_xg} auf
-\texttt{df\_xg\_raw}. Damit sind die PCA-Varianten strukturell
-konsistente Entsprechungen der Varianten 2, 4, 6 und 8.
+Aus der kombinatorischen Verknüpfung der drei Achsen entstehen zwölf
+Datensatzvarianten, die im Dictionary \texttt{variants} gespeichert werden
+(vollständige Definition: Anhang~\ref{app:code}, Listing~\ref{lst:varianten}).
+Die PCA-Varianten (9--12) sind strukturell konsistente Entsprechungen
+der Starke-Feature-Varianten 2, 4, 6 und 8.
 
 \subsection{Die Training-Pipeline: \texttt{run\_variant()}}
 
@@ -729,136 +385,31 @@ def run_variant(df_var, features):
             scaler, X_test, y_test)
 \end{lstlisting}
 
-Zwei Design-Entscheidungen sind hier zentral. Erstens wird der
-\texttt{StandardScaler} mit \texttt{fit\_transform} ausschließlich
-auf dem Trainingsdatensatz angepasst und mit \texttt{transform} auf
-dem Testdatensatz angewendet. Würde der Scaler auf allen Daten gefittet,
-würden Mittelwert und Standardabweichung des Testsets in die Normierung
-einfließen -- eine subtile Form von Data Leakage \cite{HastieEtAl2009}.
-Zweitens ist \texttt{stratify=y} im Train-Test-Split gesetzt, was
-sicherstellt, dass die Klassenverteilung im Testset proportional der
-des Gesamtdatensatzes entspricht \cite{JamesEtAl2021}.
+Zwei Design-Entscheidungen sind hier zentral. Der \texttt{StandardScaler}
+wird mit \texttt{fit\_transform} ausschließlich auf dem Trainingsdatensatz
+angepasst -- ein globales Fitten würde Testset-Statistiken einbeziehen
+und stellt damit Data Leakage dar \cite{HastieEtAl2009}. Das
+\texttt{stratify=y} im Train-Test-Split stellt sicher, dass die
+Klassenverteilung im Testset proportional zur des Gesamtdatensatzes ist
+\cite{JamesEtAl2021}.
 
 \subsection{Hyperparameter-Tuning je Algorithmus}
 
-\subsubsection{Logistische Regression}
+Alle fünf Algorithmen werden über \texttt{RandomizedSearchCV} mit
+\texttt{StratifiedKFold} (5 Folds) und F1-macro als Optimierungsmetrik
+abgestimmt. Die vollständigen Suchräume aller Modelle sind in
+Anhang~\ref{app:code} (Listings~\ref{lst:logreg-tuning}--\ref{lst:xgb-tuning})
+dokumentiert.
 
-Die Logistische Regression dient als Baseline-Modell \cite{BunkerThabtah2019}.
-Sie wird mit \texttt{class\_weight=`balanced'} initialisiert, was
-automatisch klassenspezifische Gewichte berechnet, die invers zur
-Klassenhäufigkeit sind. Die Randomized Search durchläuft 10 Iterationen:
+\textbf{Klassen-Imbalance:} Logistische Regression und Random Forest
+nutzen \texttt{class\_weight=`balanced'}. LightGBM und XGBoost erhalten
+per \texttt{compute\_sample\_weight()} berechnete Sample-Weights beim
+Fit-Aufruf, da sie kein direktes \texttt{class\_weight}-Argument
+unterstützen.
 
-\begin{lstlisting}[language=Python, caption={Tuning der Logistischen Regression},
-                   label={lst:logreg-tuning}]
-param_dist = {
-    'C':        [0.01, 0.1, 1.0, 10.0, 100.0],
-    'solver':   ['lbfgs', 'saga'],
-    'max_iter': [500, 1000],
-}
-model  = LogisticRegression(class_weight='balanced',
-                             random_state=42)
-search = RandomizedSearchCV(model, param_distributions=param_dist,
-                             n_iter=10, cv=cv, scoring='f1_macro',
-                             random_state=42, n_jobs=-1)
-search.fit(X_train, y_train)
-\end{lstlisting}
-
-Der Hyperparameter $C$ ist der inverse Regularisierungsstärke-Parameter:
-ein kleines $C$ entspricht starker L2-Regularisierung (hoher Bias,
-niedrige Varianz), ein großes $C$ schwacher Regularisierung. Die Solver
-\texttt{lbfgs} und \texttt{saga} sind beide für Multiclass-Probleme
-geeignet; \texttt{saga} unterstützt zusätzlich Sparse-Daten und L1-Regularisierung.
-
-\subsubsection{Random Forest}
-
-Der Random Forest wird ebenfalls mit \texttt{class\_weight=`balanced'}
-trainiert und durchläuft 20 Randomized-Search-Iterationen:
-
-\begin{lstlisting}[language=Python, caption={Suchraum des Random Forest},
-                   label={lst:rf-tuning}]
-param_dist = {
-    'n_estimators':      [100, 200, 300, 400],
-    'max_depth':         [None, 5, 10, 15],
-    'min_samples_split': [2, 5, 10],
-    'min_samples_leaf':  [1, 2, 4],
-    'max_features':      ['sqrt', 'log2'],
-}
-\end{lstlisting}
-
-\texttt{max\_depth=None} erlaubt den Bäumen, vollständig zu wachsen.
-\texttt{min\_samples\_split} und \texttt{min\_samples\_leaf} sind
-Regularisierungsparameter, die bestimmen, wie fein die Bäume aufgeteilt
-werden. \texttt{max\_features=`sqrt'} -- die Standardeinstellung
-nach \citet{Breiman2001} -- bedeutet, dass bei jedem Split nur
-$\sqrt{p}$ Features als Kandidaten betrachtet werden.
-
-\subsubsection{LightGBM}
-
-LightGBM benötigt eine andere Behandlung der Klassen-Imbalance, da es
-kein direktes \texttt{class\_weight}-Argument unterstützt. Stattdessen
-werden über \texttt{compute\_sample\_weight()} pro Trainingsbeispiel
-individuelle Gewichte berechnet und beim Fit übergeben:
-
-\begin{lstlisting}[language=Python, caption={LightGBM mit Sample Weights},
-                   label={lst:lgbm-tuning}]
-sample_weights = compute_sample_weight(class_weight='balanced',
-                                        y=y_train)
-param_dist = {
-    'n_estimators':     [100, 200, 300, 400],
-    'max_depth':        [3, 4, 5, 6, -1],
-    'learning_rate':    [0.01, 0.05, 0.1, 0.15],
-    'subsample':        [0.7, 0.8, 0.9, 1.0],
-    'colsample_bytree': [0.7, 0.8, 0.9, 1.0],
-    'num_leaves':       [15, 31, 63],
-    'reg_alpha':        [0, 0.1, 0.5],
-}
-search.fit(X_train, y_train, sample_weight=sample_weights)
-\end{lstlisting}
-
-Der Parameter \texttt{max\_depth=-1} signalisiert LightGBM, die
-Baumtiefe nicht zu begrenzen und stattdessen das leaf-wise Wachstum
-durch \texttt{num\_leaves} zu steuern \cite{KeEtAl2017}.
-\texttt{reg\_alpha} ist der L1-Regularisierungsterm. \texttt{subsample}
-und \texttt{colsample\_bytree} kontrollieren, welcher Anteil der
-Trainingsdaten bzw.\ Features für jeden Baum zufällig gezogen wird --
-ähnlich dem Bootstrap-Sampling im Random Forest, aber ohne Zurücklegen.
-
-\subsubsection{XGBoost}
-
-XGBoost wird analog zu LightGBM mit Sample Weights trainiert:
-
-\begin{lstlisting}[language=Python, caption={XGBoost-Suchraum mit Sample Weights},
-                   label={lst:xgb-tuning}]
-sample_weights = compute_sample_weight(class_weight='balanced',
-                                        y=y_train)
-param_dist = {
-    'n_estimators':      [100, 200, 300, 400],
-    'max_depth':         [3, 4, 5, 6],
-    'learning_rate':     [0.01, 0.05, 0.1, 0.15],
-    'subsample':         [0.7, 0.8, 0.9, 1.0],
-    'colsample_bytree':  [0.7, 0.8, 0.9, 1.0],
-    'min_child_weight':  [1, 3, 5],
-    'gamma':             [0, 0.1, 0.2],
-}
-model = XGBClassifier(eval_metric='mlogloss', random_state=42)
-search.fit(X_train, y_train, sample_weight=sample_weights)
-\end{lstlisting}
-
-Die Parameter \texttt{min\_child\_weight} und \texttt{gamma} sind
-XGBoost-spezifische Regularisierungsparameter: \texttt{min\_child\_weight}
-definiert die Mindestsumme der Instance-Weights in einem Blatt-Knoten
-und verhindert zu feine Splits; \texttt{gamma} ist die minimale
-Verlustreduzierung, die für einen Split erforderlich ist \cite{ChenGuestrin2016}.
-Als Verlustfunktion wird \texttt{mlogloss} (Multi-Class Log-Loss)
-verwendet, die für Mehrklassenprobleme geeignet ist.
-
-\subsubsection{Multilayer Perceptron}
-
-Das MLP erfordert die aufwendigste Behandlung der Klassen-Imbalance,
-da \texttt{sklearn}'s \texttt{MLPClassifier} weder
-\texttt{class\_weight} noch \texttt{sample\_weight} unterstützt.
-Als Lösung wird manuelles Oversampling auf dem Trainingsdatensatz
-durchgeführt:
+\textbf{MLP -- manuelles Oversampling:} Da \texttt{MLPClassifier}
+weder \texttt{class\_weight} noch \texttt{sample\_weight} unterstützt,
+wird die Klassen-Imbalance durch manuelles Oversampling behoben:
 
 \begin{lstlisting}[language=Python, caption={Manuelles Oversampling für das MLP},
                    label={lst:mlp-oversampling}]
@@ -878,193 +429,52 @@ X_bal = pd.concat(X_resampled).values
 y_bal = pd.concat(y_resampled).values
 \end{lstlisting}
 
-Für jede Minderheitsklasse wird zufällig mit Zurücklegen aus den
-vorhandenen Trainingsbeispielen dieser Klasse geschöpft, bis alle
-Klassen gleich groß sind (\textit{Random Oversampling})
-\cite{ChawlaEtAl2002}. Das Oversampling findet ausschließlich auf dem
-Trainingsdatensatz statt; das Testset bleibt vollständig unberührt.
-Das MLP selbst wird mit \texttt{early\_stopping=True} und einer
-Validierungsfraktion von 10\,\% trainiert:
+Für jede Minderheitsklasse wird mit Zurücklegen aus den vorhandenen
+Trainingsbeispielen geschöpft, bis alle Klassen gleich groß sind
+(\textit{Random Oversampling}) \cite{ChawlaEtAl2002}. Das Oversampling
+findet ausschließlich auf dem Trainingsdatensatz statt; das Testset
+bleibt vollständig unberührt. Zusätzlich wird das MLP mit
+\texttt{early\_stopping=True} trainiert, sodass das Training abbricht,
+sobald der Validierungsverlust nicht mehr sinkt \cite{GoodfellowEtAl2016}
+(Listing~\ref{lst:mlp-config} im Anhang).
 
-\begin{lstlisting}[language=Python, caption={MLP-Konfiguration mit Early Stopping},
-                   label={lst:mlp-config}]
-param_dist = {
-    'hidden_layer_sizes': [(64,), (128,), (64,32), (128,64),
-                           (128,64,32), (256,128,64)],
-    'activation':         ['relu', 'tanh'],
-    'alpha':              [0.0001, 0.001, 0.01],
-    'learning_rate_init': [0.001, 0.005, 0.01],
-    'max_iter':           [300, 500],
-}
-model = MLPClassifier(random_state=42, early_stopping=True,
-                       validation_fraction=0.1)
-\end{lstlisting}
+\subsection{Trainingsschleife und Modellselektion}
 
-Die Architektur-Suche umfasst Netzwerke von einer bis drei versteckten
-Schichten mit 64 bis 256 Neuronen. Die Aktivierungsfunktion
-\texttt{relu} ist die Standardwahl für tiefe Netze; \texttt{tanh}
-wird als Alternative gesucht, da sie negative Aktivierungen erzeugen
-kann. \texttt{alpha} ist der L2-Regularisierungsterm für die
-Gewichte. Early Stopping überwacht den Validierungsverlust und
-bricht das Training ab, sobald keine Verbesserung mehr eintritt --
-der beste Modellzustand wird dabei gespeichert
-\cite{GoodfellowEtAl2016}.
+Die äußere Schleife iteriert über alle 12 Varianten und speichert für
+jeden Modelltyp das Ergebnis mit dem höchsten F1-macro auf dem Testset
+(Anhang~\ref{app:code}, Listing~\ref{lst:training-loop}).
+Nach Abschluss aller 60 Läufe werden die fünf besten Modelle
+(je eines pro Typ) über \texttt{full\_evaluation()} ausgewertet:
+Konfusionsmatrix, Precision/Recall/F1 pro Klasse sowie CV-Stabilität.
+Das beste Gesamtmodell wird als \texttt{.pkl}-Package gespeichert, das
+neben dem trainierten Modell auch den Scaler, die Feature-Liste und die
+LabelEncoder-Klassen enthält -- alle Objekte, die für eine spätere
+Vorhersage gemeinsam benötigt werden (Listing~\ref{lst:model-save}
+im Anhang) \cite{ScikitLearn2024}.
 
-\subsection{Trainingsschleife über alle 12 Varianten}
+\subsection{Ergebnisvisualisierungen}
 
-Die äußere Trainingsschleife iteriert über alle Varianten und
-akkumuliert die Ergebnisse:
-
-\begin{lstlisting}[language=Python, caption={Äußere Trainingsschleife},
-                   label={lst:training-loop}]
-for variant_name, (df_var, features) in variants.items():
-    logreg_res, rf_res, lgbm_res, xgb_res, mlp_res, \
-        scaler, X_test, y_test = run_variant(df_var, features)
-
-    # Bestes Modell je Typ tracken
-    for name, res in zip(MODEL_NAMES, all_res):
-        if res['metrics']['f1_macro'] > \
-                best_per_model[name]['metrics']['f1_macro']:
-            best_per_model[name] = {
-                **res, 'name': variant_name,
-                'scaler': scaler, 'X_test': X_test,
-                'y_test': y_test
-            }
-\end{lstlisting}
-
-Das Dictionary \texttt{best\_per\_model} enthält nach Abschluss der
-Schleife für jeden der fünf Modelltypen das beste Modell über alle
-12 Varianten -- gemessen am F1-macro-Score auf dem Testset. Dadurch
-wird sichergestellt, dass die finale Evaluation des besten Modells
-je Typ auf dem Modell mit der höchsten tatsächlichen Testperformance
-basiert, nicht auf dem mit dem besten CV-Score \cite{JamesEtAl2021}.
-
-\subsection{Visualisierung der Zwischenergebnisse}
-
-Nach dem Training aller 60 Modelle werden drei Visualisierungen
-erstellt, die einen schnellen Überblick über die Ergebnisse liefern.
-
-\textbf{F1-Vergleichs-Balkendiagramm:} Für jede der 12 Varianten
-werden die F1-macro-Werte aller fünf Modelle nebeneinander als
-Balkendiagramm dargestellt. Eine zweite Subplot-Zeile zeigt den
-F1-Draw-Score.
-
-\textbf{F1-Heatmap:} Eine Heatmap stellt alle Modelle $\times$ alle
-Varianten in einer übersichtlichen Matrix dar. Die Farbe kodiert
-den F1-macro-Wert (gelb = niedrig, grün = hoch), was systematische
-Muster auf einen Blick erkennbar macht.
-
-\textbf{Radar-Chart:} Ein Radar-Chart vergleicht die fünf besten
-Modelle (je Typ) über die Metriken F1-macro, F1-Draw, Accuracy,
-Precision und Recall.
-
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{plots/plot_f1_heatmap.png}
     \caption{F1-macro-Heatmap aller fünf Modelle über alle zwölf
              Datensatzvarianten. Dunklere Grüntöne indizieren höhere
-             F1-macro-Werte. Die Heatmap macht auf einen Blick sichtbar,
-             welche Modell-Varianten-Kombinationen am besten performen
-             und ob xG-Varianten (Zeilen 5--12) konsistent besser
-             abschneiden als Nicht-xG-Varianten (Zeilen 1--4).}
+             F1-macro-Werte. xG-Varianten (obere sechs Zeilen) zeigen
+             konsistent höhere Werte als Nicht-xG-Varianten.}
     \label{fig:f1-heatmap}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.65\textwidth]{plots/plot_radar.png}
     \caption{Radar-Chart der besten Modelle je Typ über fünf Metriken.
-             Ein größeres Polygon entspricht einer besseren Gesamtleistung.
-             Besonders der F1-Draw-Achsenpunkt zeigt, wie unterschiedlich
-             die Modelle mit der Unentschieden-Klasse umgehen.}
+             Ein größeres Polygon entspricht einer besseren Gesamtleistung.}
     \label{fig:radar}
 \end{figure}
 
-\subsection{Finale Evaluation}
-
-Die Funktion \texttt{full\_evaluation()} führt eine umfassende Auswertung
-jedes der fünf besten Modelle durch. Sie berechnet alle Metriken
-auf dem Testset und erstellt drei Grafik-Blöcke.
-
-\textbf{Grafik-Block 1: Konfusionsmatrix und Metriken pro Klasse.}
-Für jedes Modell werden eine absolute und eine zeilennormalisierte
-Konfusionsmatrix ausgegeben, ergänzt durch einen Balkenplot mit
-Precision, Recall und F1 je Klasse:
-
-\begin{lstlisting}[language=Python, caption={Konfusionsmatrix im Evaluationscode},
-                   label={lst:conf-matrix}]
-cm = confusion_matrix(y_test, y_pred)
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-            xticklabels=classes, yticklabels=classes)
-
-cm_norm = confusion_matrix(y_test, y_pred, normalize='true')
-sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues',
-            xticklabels=classes, yticklabels=classes)
-\end{lstlisting}
-
-Die normalisierte Konfusionsmatrix zeigt zeilenweise, welcher Anteil
-jeder tatsächlichen Klasse korrekt (Hauptdiagonale) bzw.\ falsch
-klassifiziert wurde (Nebendiagonale). Sie ist besonders aufschlussreich
-für die Unentschieden-Klasse: Wenn die Zeile \texttt{D} fast vollständig
-in andere Klassen fließt, zeigt das die systematische Schwäche des
-Modells bei Unentschieden \cite{Powers2020}.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\textwidth]{plots/plot_confusion_matrix.png}
-    \caption{Konfusionsmatrix (absolut und normalisiert) sowie
-             Precision/Recall/F1 pro Klasse für das beste Modell.
-             Die normalisierte Matrix zeigt auf Zeilenebene, wie gut
-             jede tatsächliche Klasse erkannt wird. Insbesondere
-             die Zeile der Klasse D (Unentschieden) ist entscheidend
-             für die Beurteilung der Modellqualität.}
-    \label{fig:confusion-matrix}
-\end{figure}
-
-\textbf{Grafik-Block 2: CV-Stabilität.} Ein Linienplot zeigt die
-F1-macro-Werte über alle Iterationen der Randomized Search, ergänzt
-durch den Mittelwert und das $\pm 1$-Standardabweichungs-Band. Geringe
-Schwankung signalisiert ein stabiles, gut generalisierbares Modell.
-
-\subsection{Modellspeicherung}
-
-Das beste Modell wird nach der finalen Evaluation als
-\texttt{.pkl}-Datei gespeichert. Das gespeicherte Package enthält
-alle für spätere Nutzung erforderlichen Objekte:
-
-\begin{lstlisting}[language=Python, caption={Speicherung des besten Modells},
-                   label={lst:model-save}]
-save_package = {
-    'model':       best_model_obj['model'],    # trainiertes Modell
-    'scaler':      best_model_obj['scaler'],   # gefitteter StandardScaler
-    'model_type':  best_model_name,            # z.B. 'XGBoost'
-    'variant':     best_model_obj['name'],     # Datensatz-Variante
-    'metrics': {
-        'f1_macro':  ..., 'f1_draw': ...,
-        'accuracy':  ..., 'precision': ..., 'recall': ...,
-    },
-    'best_params': best_model_obj['best_params'],
-    'saved_at':    datetime.now().strftime('%Y-%m-%d %H:%M'),
-    'features':    variants[best_model_obj['name']][1],
-    'le_classes':  list(le.classes_),          # ['A', 'D', 'H']
-}
-joblib.dump(save_package, save_path)
-\end{lstlisting}
-
-Das Package enthält bewusst sowohl das Modell als auch den Scaler,
-die Feature-Liste und die LabelEncoder-Klassen. Nur wenn alle vier
-Objekte gemeinsam vorliegen, kann eine neue Vorhersage korrekt
-durchgeführt werden: Die Features müssen in exakt derselben
-Reihenfolge vorliegen wie beim Training, die Skalierung muss mit
-denselben Parametern erfolgen und die Modellausgabe muss mit denselben
-Klassen-Labels interpretiert werden \cite{ScikitLearn2024}.
-
 \subsection{Zusammenfassung der Implementierung}
 
-Tabelle~\ref{tab:impl-zusammenfassung} fasst die zentralen Parameter
-der Implementierung zusammen.
-
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{Zusammenfassung der Implementierungsparameter}
     \label{tab:impl-zusammenfassung}
@@ -1072,28 +482,15 @@ der Implementierung zusammen.
         \toprule
         \textbf{Komponente} & \textbf{Parameter} & \textbf{Wert / Begründung} \\
         \midrule
-        EWA Span            & \texttt{span=10}   & $\alpha \approx 0{,}18$; neuere Spiele dominant \\
-        IQR Multiplikator   & $c = 3{,}0$        & Nur extreme Ausreißer entfernen \\
-        Korr.-Schwellenwert & $|\,r\,| > 0{,}1$  & Rauschen-freie Feature-Selektion \\
-        PCA Varianz         & 95\,\%             & Standardwert; Multikollinearität reduzieren \\
+        EWA Span            & \texttt{span=10}     & $\alpha \approx 0{,}18$; neuere Spiele dominant \\
+        IQR Multiplikator   & $c = 3{,}0$          & Nur extreme Ausreißer entfernen \\
+        Korr.-Schwellenwert & $|\,r\,| > 0{,}1$    & Rauschen-freie Feature-Selektion \\
+        PCA Varianz         & 95\,\%               & Multikollinearität reduzieren \\
         Train-Test-Split    & 80:20, stratifiziert & Repräsentative Klassenverteilung \\
-        CV Folds            & 5                  & Stratified K-Fold \\
-        Optimierungsmetrik  & F1 macro           & Robust bei Klassen-Imbalance \\
-        Random Seed         & 42                 & Reproduzierbarkeit aller Läufe \\
-        Gesamtläufe         & 60                 & 12 Varianten $\times$ 5 Modelle \\
+        CV Folds            & 5                    & Stratified K-Fold \\
+        Optimierungsmetrik  & F1 macro             & Robust bei Klassen-Imbalance \\
+        Random Seed         & 42                   & Reproduzierbarkeit aller Läufe \\
+        Gesamtläufe         & 60                   & 12 Varianten $\times$ 5 Modelle \\
         \bottomrule
     \end{tabular}
 \end{table}
-
-\textbf{Plots, die aus dem Notebook gespeichert werden sollen:}
-Für die in diesem Kapitel referenzierten Abbildungen müssen folgende
-Plots aus dem Notebook gespeichert und im Verzeichnis \texttt{plots/}
-abgelegt werden:
-\begin{enumerate}
-    \item \textbf{\texttt{plot\_ftr\_verteilung.png}}: Notebook-Zelle~6 -- Balkendiagramm der FTR-Verteilung.
-    \item \textbf{\texttt{plot\_korrelation\_target.png}}: Notebook-Zelle~12 -- horizontaler Barplot \glqq Korrelation der BASE\_FEATURES mit der Zielvariable\grqq{}.
-    \item \textbf{\texttt{plot\_pca\_analyse.png}}: Notebook-Zelle~18 -- PCA-Analyse für Variante~11 (Scree Plot + kumulierte Varianz + Biplot).
-    \item \textbf{\texttt{plot\_f1\_heatmap.png}}: Notebook-Zelle~25 -- F1-macro-Heatmap aller Modelle $\times$ Varianten.
-    \item \textbf{\texttt{plot\_radar.png}}: Notebook-Zelle~25 -- Radar-Chart bestes Modell je Typ.
-    \item \textbf{\texttt{plot\_confusion\_matrix.png}}: Notebook-Zelle~27 -- Konfusionsmatrix (absolut + normalisiert) des besten Modells.
-\end{enumerate}
