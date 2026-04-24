@@ -128,11 +128,11 @@ findet sich in Anhang~\ref{app:code} (Listing~\ref{lst:korr}).
 \end{figure}
 
 Abbildung~\ref{fig:korrelation-target} zeigt, dass punktebezogene
-EWA-Features (\texttt{points\_diff\_avg},
-\texttt{home\_team\_overall\_ewa\_Points}) die stärksten positiven
-Korrelationen mit dem Heimerfolg aufweisen. Dieses Ergebnis motiviert
-die spätere Feature-Selektion mit einem Schwellenwert von
-$|\,r\,| > 0{,}1$.
+EWA-Features die stärksten Korrelationen mit dem Heimerfolg aufweisen --
+insbesondere \texttt{points\_diff\_avg} und
+\texttt{home\_team\_overall\_ewa\_Points}.
+Dieses Ergebnis motiviert die spätere Feature-Selektion mit einem
+Schwellenwert von $|\,r\,| > 0{,}1$.
 
 % =============================================================================
 \section{Feature Engineering}
@@ -454,7 +454,7 @@ im Anhang) \cite{ScikitLearn2024}.
 
 \subsection{Ergebnisvisualisierungen}
 
-\begin{figure}[H]
+\begin{figure}[h]
     \centering
     \includegraphics[width=\textwidth]{plots/plot_f1_heatmap.png}
     \caption{F1-macro-Heatmap aller fünf Modelle über alle zwölf
@@ -464,7 +464,7 @@ im Anhang) \cite{ScikitLearn2024}.
     \label{fig:f1-heatmap}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[h]
     \centering
     \includegraphics[width=0.65\textwidth]{plots/plot_radar.png}
     \caption{Radar-Chart der besten Modelle je Typ über fünf Metriken.
@@ -474,7 +474,7 @@ im Anhang) \cite{ScikitLearn2024}.
 
 \subsection{Zusammenfassung der Implementierung}
 
-\begin{table}[H]
+\begin{table}[h]
     \centering
     \caption{Zusammenfassung der Implementierungsparameter}
     \label{tab:impl-zusammenfassung}

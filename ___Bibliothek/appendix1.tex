@@ -1,0 +1,411 @@
+% =============================================================================
+% ANHANG A: CODE-LISTINGS
+% =============================================================================
+
+\chapter{Code-Listings}\label{app:code}
+
+Dieser Anhang enthält alle Quellcode-Auszüge, die für das Verständnis der
+Implementierung ergänzend sind, aber im Haupttext den Lesefluss unterbrechen
+würden. Die Listings sind thematisch nach den Abschnitten von
+Kapitel~\ref{chap:modellierung} geordnet.
+
+% -----------------------------------------------------------------------------
+\section{Datenladen und Vorverarbeitung}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={Finale Bereinigung und Sortierung nach dem Laden},
+                   label={lst:load-clean}]
+all_data = all_data.dropna(subset=["FTR"])
+all_data["FTR"] = all_data["FTR"].str.strip()
+all_data = all_data[all_data["FTR"].isin(["H", "D", "A"])]
+for col in ["FTHG", "FTAG", "HS", "AS", "HST", "AST", "HTHG", "HTAG"]:
+    if col in all_data.columns:
+        all_data[col] = pd.to_numeric(all_data[col], errors="coerce")
+all_data = all_data.sort_values(["Season", "Date"]).reset_index(drop=True)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={\texttt{normalize\_team()} und Auszug aus \texttt{TEAM\_NAME\_MAP}},
+                   label={lst:normalize}]
+TEAM_NAME_MAP = {
+    "Dortmund":          "Borussia Dortmund",
+    "Borussia Dortmund": "Borussia Dortmund",
+    "M'gladbach":        "Borussia M.Gladbach",
+    "Ein Frankfurt":     "Eintracht Frankfurt",
+    "RB Leipzig":        "RasenBallsport Leipzig",
+    # ... (weitere Eintraege fuer alle 36 Vereine)
+}
+
+def normalize_team(name: str) -> str:
+    name = str(name).strip()
+    return TEAM_NAME_MAP.get(name, name)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Per-Spiel-Normierung der xG-Saisonsummen},
+                   label={lst:load-xg}]
+if "matches" in df.columns:
+    for col in ["xG", "xGA", "xPTS"]:
+        if col in df.columns:
+            df[f"{col}_per_game"] = (
+                pd.to_numeric(df[col], errors="coerce") /
+                pd.to_numeric(df["matches"], errors="coerce")
+            )
+\end{lstlisting}
+
+% -----------------------------------------------------------------------------
+\section{Explorative Datenanalyse}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={Visualisierung der FTR-Klassenverteilung},
+                   label={lst:ftr-plot}]
+sns.countplot(data=df_base, x='FTR', order=['H', 'D', 'A'],
+              hue='FTR', legend=False, palette='viridis', ax=ax)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Numerische Kodierung der Zielvariable und Korrelationsmatrix},
+                   label={lst:korr}]
+mapping = {'H': 1, 'D': 0, 'A': -1}
+df_base['Target_Heimerfolg'] = df_base['FTR'].map(mapping)
+
+corr_base = df_base[BASE_FEATURES + ['Target_Heimerfolg']].corr()
+sns.heatmap(corr_base, mask=mask, cmap='coolwarm', center=0,
+            annot=True, fmt=".2f", linewidths=0.5)
+\end{lstlisting}
+
+% -----------------------------------------------------------------------------
+\section{Feature Engineering}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={Transformation der Spieldaten ins Team-Spiel-Format},
+                   label={lst:longformat}]
+home_stats = df[["Season","Date","HomeTeam","FTHG","FTAG",
+                  "FTR","HS","HST"]].copy()
+home_stats.rename(columns={
+    "HomeTeam": "Team", "FTHG": "GoalsScored",
+    "FTAG": "GoalsConceded", "HS": "Shots",
+    "HST": "ShotsOnTarget"
+}, inplace=True)
+home_stats["is_home"] = 1
+
+away_stats = df[["Season","Date","AwayTeam","FTHG","FTAG",
+                  "FTR","AS","AST"]].copy()
+away_stats.rename(columns={
+    "AwayTeam": "Team", "FTAG": "GoalsScored",   # Achtung: FTAG!
+    "FTHG": "GoalsConceded", "AS": "Shots",
+    "AST": "ShotsOnTarget"
+}, inplace=True)
+away_stats["is_home"] = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Punkteberechnung aus Teamperspektive},
+                   label={lst:punkte}]
+def calc_points(row):
+    if row["FTR"] == "D": return 1
+    if row["is_home"] == 1 and row["FTR"] == "H": return 3
+    if row["is_home"] == 0 and row["FTR"] == "A": return 3
+    return 0
+
+all_stats["Points"] = all_stats.apply(calc_points, axis=1)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={EWA in drei Kontexten: Overall, Home Form, Away Form},
+                   label={lst:drei-kontexte}]
+# 1. OVERALL: alle Spiele (Heim und Auswaerts)
+overall_ewa = compute_ewa(all_stats, span)
+overall_ewa.columns = [f"overall_ewa_{c}" for c in overall_ewa.columns]
+
+# 2. HOME FORM: nur Heimspiele des Heimteams
+home_only = all_stats[all_stats["is_home"] == 1].copy()
+home_ewa  = compute_ewa(home_only, span)
+home_ewa.columns = [f"home_form_ewa_{c}" for c in home_ewa.columns]
+
+# 3. AWAY FORM: nur Auswaertsspiele des Auswaertsteams
+away_only = all_stats[all_stats["is_home"] == 0].copy()
+away_ewa  = compute_ewa(away_only, span)
+away_ewa.columns = [f"away_form_ewa_{c}" for c in away_ewa.columns]
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Merge der EWA-Features in den Match-Level-DataFrame},
+                   label={lst:merge-ewa}]
+h_all.columns = [f"home_team_{c}" if c not in ["Date","Team"]
+                 else c for c in h_all.columns]
+a_all.columns = [f"away_team_{c}" if c not in ["Date","Team"]
+                 else c for c in a_all.columns]
+
+df = df.merge(h_all, left_on=["Date","HomeTeam"],
+              right_on=["Date","Team"], how="left").drop(columns=["Team"])
+df = df.merge(a_all, left_on=["Date","AwayTeam"],
+              right_on=["Date","Team"], how="left").drop(columns=["Team"])
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Berechnung der abgeleiteten Differenz-Features},
+                   label={lst:diff-features}]
+df["goal_diff_avg"]   = (df["home_team_overall_ewa_GoalsScored"]
+                         - df["away_team_overall_ewa_GoalsScored"])
+df["points_diff_avg"] = (df["home_team_overall_ewa_Points"]
+                         - df["away_team_overall_ewa_Points"])
+
+df["abs_goal_diff"]   = df["goal_diff_avg"].abs()
+df["abs_points_diff"] = df["points_diff_avg"].abs()
+
+df["combined_draw_tendency"] = (
+    1.0 / (1.0 + df["abs_goal_diff"]) *
+    1.0 / (1.0 + df["abs_points_diff"])
+)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Zweifacher Join der xG-Daten für Heim- und Auswärtsteam},
+                   label={lst:xg-join}]
+home_xg = xg_mapped.rename(columns={
+    "Team": "HomeTeam", "MatchSeason": "Season",
+    "xG_per_game":  "home_xG_per_game",
+    "xGA_per_game": "home_xGA_per_game",
+    "xPTS_per_game":"home_xPTS_per_game",
+})
+result = match_df.merge(home_xg, on=["HomeTeam", "Season"], how="left")
+# Analog fuer Auswaertsteam (away_xG_per_game, away_xGA_per_game, ...)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Definition der Feature-Sets BASE\_FEATURES und XG\_FEATURES},
+                   label={lst:feature-sets}]
+BASE_FEATURES = [
+    # Overall EWA -- Heimteam (5 Features)
+    "home_team_overall_ewa_GoalsScored",
+    "home_team_overall_ewa_GoalsConceded",
+    "home_team_overall_ewa_Points",
+    "home_team_overall_ewa_Shots",
+    "home_team_overall_ewa_ShotsOnTarget",
+    # Heimform EWA -- Heimteam (5 Features)
+    "home_team_home_form_ewa_GoalsScored",
+    "home_team_home_form_ewa_GoalsConceded",
+    "home_team_home_form_ewa_Points",
+    "home_team_home_form_ewa_Shots",
+    "home_team_home_form_ewa_ShotsOnTarget",
+    # Overall EWA -- Auswaertsteam (5 Features)
+    "away_team_overall_ewa_GoalsScored",
+    "away_team_overall_ewa_GoalsConceded",
+    "away_team_overall_ewa_Points",
+    "away_team_overall_ewa_Shots",
+    "away_team_overall_ewa_ShotsOnTarget",
+    # Auswaertsform EWA -- Auswaertsteam (5 Features)
+    "away_team_away_form_ewa_GoalsScored",
+    "away_team_away_form_ewa_GoalsConceded",
+    "away_team_away_form_ewa_Points",
+    "away_team_away_form_ewa_Shots",
+    "away_team_away_form_ewa_ShotsOnTarget",
+    # Differenz-Features (5 Features)
+    "goal_diff_avg", "points_diff_avg",
+    "abs_goal_diff", "abs_points_diff",
+    "combined_draw_tendency",
+]  # = 25 Features gesamt
+
+XG_FEATURES = BASE_FEATURES + [
+    "home_xG_per_game",  "home_xGA_per_game",  "home_xPTS_per_game",
+    "away_xG_per_game",  "away_xGA_per_game",  "away_xPTS_per_game",
+    "xG_diff", "xGA_diff", "abs_xG_diff",
+]  # = 34 Features gesamt
+\end{lstlisting}
+
+% -----------------------------------------------------------------------------
+\section{Datensatzvarianten und Vorverarbeitung}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={LabelEncoder für die Zielvariable FTR},
+                   label={lst:labelencoder}]
+le = LabelEncoder()
+df_base['Target']    = le.fit_transform(df_base['FTR'])
+df_with_xg['Target'] = le.transform(df_with_xg['FTR'])
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={IQR-basierte Ausreißerbereinigung (Multiplikator 3,0)},
+                   label={lst:iqr}]
+def remove_outliers_iqr(df, features, multiplier=3.0):
+    df_out = df.copy()
+    for col in features:
+        Q1  = df_out[col].quantile(0.25)
+        Q3  = df_out[col].quantile(0.75)
+        IQR = Q3 - Q1
+        df_out = df_out[~(
+            (df_out[col] < (Q1 - multiplier * IQR)) |
+            (df_out[col] > (Q3 + multiplier * IQR))
+        )]
+    return df_out
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Korrelationsbasierte Feature-Selektion mit Schwellenwert 0,1},
+                   label={lst:feature-sel}]
+def get_strong_features(df, features,
+                         target_col='Target_Heimerfolg',
+                         threshold=0.1):
+    corr = df[features + [target_col]].corr()[target_col].abs()
+    corr = corr.drop(target_col)
+    strong = corr[corr > threshold].index.tolist()
+    if len(strong) == 0:
+        strong = corr.sort_values(ascending=False).head(5).index.tolist()
+    return strong
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={PCA-Transformation auf 95\,\% erklärte Varianz},
+                   label={lst:pca-impl}]
+def apply_pca(df, features, variance=0.95):
+    scaler_pca = StandardScaler()
+    X_scaled   = scaler_pca.fit_transform(df[features])
+    pca = PCA(n_components=variance, random_state=42)
+    X_pca        = pca.fit_transform(X_scaled)
+    n_components = pca.n_components_
+    col_names    = [f'PC{i+1}' for i in range(n_components)]
+    df_pca = pd.DataFrame(X_pca, index=df.index, columns=col_names)
+    df_pca['Target'] = df['Target'].values
+    df_pca['FTR']    = df['FTR'].values
+    return df_pca, col_names, n_components
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Definition aller zwölf Datensatzvarianten},
+                   label={lst:varianten}]
+variants = {
+    " 1. Ohne xG | Raw   | Alle Features":   (df_base_raw,   BASE_FEATURES),
+    " 2. Ohne xG | Raw   | Starke Features": (df_base_raw,   strong_base),
+    " 3. Ohne xG | Clean | Alle Features":   (df_base_clean, BASE_FEATURES),
+    " 4. Ohne xG | Clean | Starke Features": (df_base_clean, strong_base),
+    " 5. Mit xG  | Raw   | Alle Features":   (df_xg_raw,     XG_FEATURES),
+    " 6. Mit xG  | Raw   | Starke Features": (df_xg_raw,     strong_xg),
+    " 7. Mit xG  | Clean | Alle Features":   (df_xg_clean,   XG_FEATURES),
+    " 8. Mit xG  | Clean | Starke Features": (df_xg_clean,   strong_xg),
+    " 9. Ohne xG | Raw   | PCA (Basis V2)":  (df_pca_v2,     pca_cols_v2),
+    "10. Ohne xG | Clean | PCA (Basis V4)":  (df_pca_v4,     pca_cols_v4),
+    "11. Mit xG  | Raw   | PCA (Basis V6)":  (df_pca_v6,     pca_cols_v6),
+    "12. Mit xG  | Clean | PCA (Basis V8)":  (df_pca_v8,     pca_cols_v8),
+}
+\end{lstlisting}
+
+% -----------------------------------------------------------------------------
+\section{Modelltraining und Hyperparameter-Suchräume}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={Hyperparameter-Suchraum: Logistische Regression},
+                   label={lst:logreg-tuning}]
+param_dist = {
+    'C':        [0.01, 0.1, 1.0, 10.0, 100.0],
+    'solver':   ['lbfgs', 'saga'],
+    'max_iter': [500, 1000],
+}
+model  = LogisticRegression(class_weight='balanced', random_state=42)
+search = RandomizedSearchCV(model, param_distributions=param_dist,
+                             n_iter=10, cv=cv, scoring='f1_macro',
+                             random_state=42, n_jobs=-1)
+search.fit(X_train, y_train)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Hyperparameter-Suchraum: Random Forest},
+                   label={lst:rf-tuning}]
+param_dist = {
+    'n_estimators':      [100, 200, 300, 400],
+    'max_depth':         [None, 5, 10, 15],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf':  [1, 2, 4],
+    'max_features':      ['sqrt', 'log2'],
+}
+model  = RandomForestClassifier(class_weight='balanced',
+                                 random_state=42, n_jobs=-1)
+search = RandomizedSearchCV(model, param_distributions=param_dist,
+                             n_iter=20, cv=cv, scoring='f1_macro',
+                             random_state=42, n_jobs=-1)
+search.fit(X_train, y_train)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Hyperparameter-Suchraum: LightGBM mit Sample Weights},
+                   label={lst:lgbm-tuning}]
+sample_weights = compute_sample_weight(class_weight='balanced',
+                                        y=y_train)
+param_dist = {
+    'n_estimators':     [100, 200, 300, 400],
+    'max_depth':        [3, 4, 5, 6, -1],
+    'learning_rate':    [0.01, 0.05, 0.1, 0.15],
+    'subsample':        [0.7, 0.8, 0.9, 1.0],
+    'colsample_bytree': [0.7, 0.8, 0.9, 1.0],
+    'num_leaves':       [15, 31, 63],
+    'reg_alpha':        [0, 0.1, 0.5],
+}
+search.fit(X_train, y_train, sample_weight=sample_weights)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Hyperparameter-Suchraum: XGBoost mit Sample Weights},
+                   label={lst:xgb-tuning}]
+sample_weights = compute_sample_weight(class_weight='balanced',
+                                        y=y_train)
+param_dist = {
+    'n_estimators':      [100, 200, 300, 400],
+    'max_depth':         [3, 4, 5, 6],
+    'learning_rate':     [0.01, 0.05, 0.1, 0.15],
+    'subsample':         [0.7, 0.8, 0.9, 1.0],
+    'colsample_bytree':  [0.7, 0.8, 0.9, 1.0],
+    'min_child_weight':  [1, 3, 5],
+    'gamma':             [0, 0.1, 0.2],
+}
+model = XGBClassifier(eval_metric='mlogloss', random_state=42)
+search.fit(X_train, y_train, sample_weight=sample_weights)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={MLP-Konfiguration mit Early Stopping},
+                   label={lst:mlp-config}]
+param_dist = {
+    'hidden_layer_sizes': [(64,), (128,), (64,32), (128,64),
+                           (128,64,32), (256,128,64)],
+    'activation':         ['relu', 'tanh'],
+    'alpha':              [0.0001, 0.001, 0.01],
+    'learning_rate_init': [0.001, 0.005, 0.01],
+    'max_iter':           [300, 500],
+}
+model = MLPClassifier(random_state=42, early_stopping=True,
+                       validation_fraction=0.1)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Äußere Trainingsschleife mit Modellselektion},
+                   label={lst:training-loop}]
+for variant_name, (df_var, features) in variants.items():
+    logreg_res, rf_res, lgbm_res, xgb_res, mlp_res, \
+        scaler, X_test, y_test = run_variant(df_var, features)
+
+    # Bestes Modell je Typ tracken
+    for name, res in zip(MODEL_NAMES, all_res):
+        if res['metrics']['f1_macro'] > \
+                best_per_model[name]['metrics']['f1_macro']:
+            best_per_model[name] = {
+                **res, 'name': variant_name,
+                'scaler': scaler, 'X_test': X_test,
+                'y_test': y_test
+            }
+\end{lstlisting}
+
+% -----------------------------------------------------------------------------
+\section{Evaluation und Modellspeicherung}
+% -----------------------------------------------------------------------------
+
+\begin{lstlisting}[language=Python, caption={Erstellung der Konfusionsmatrizen im Evaluationscode},
+                   label={lst:conf-matrix}]
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=classes, yticklabels=classes)
+
+cm_norm = confusion_matrix(y_test, y_pred, normalize='true')
+sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues',
+            xticklabels=classes, yticklabels=classes)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption={Speicherung des besten Modells als \texttt{.pkl}-Package},
+                   label={lst:model-save}]
+save_package = {
+    'model':       best_model_obj['model'],    # trainiertes Modell
+    'scaler':      best_model_obj['scaler'],   # gefitteter StandardScaler
+    'model_type':  best_model_name,            # z.B. 'RandomForest'
+    'variant':     best_model_obj['name'],     # Datensatz-Variante
+    'metrics': {
+        'f1_macro':  ..., 'f1_draw': ...,
+        'accuracy':  ..., 'precision': ..., 'recall': ...,
+    },
+    'best_params': best_model_obj['best_params'],
+    'saved_at':    datetime.now().strftime('%Y-%m-%d %H:%M'),
+    'features':    variants[best_model_obj['name']][1],
+    'le_classes':  list(le.classes_),          # ['A', 'D', 'H']
+}
+joblib.dump(save_package, save_path)
+\end{lstlisting}
